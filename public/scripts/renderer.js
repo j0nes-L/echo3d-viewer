@@ -46,7 +46,7 @@ loader.load(FILENAME, function (geometry) {
         controls.target.set(0, 0, 0);
         controls.minDistance = radius * 0.1;
         controls.maxDistance = radius * 10;
-        controls.zoomSpeed = radius * 0.3;
+        controls.zoomSpeed = 3.0;
 
         camera.position.set(0, 0, radius * 2.0);
         controls.update();
@@ -56,7 +56,7 @@ loader.load(FILENAME, function (geometry) {
     infoDiv.innerText = "Quest 3 Point Cloud Viewer";
 
 }, (xhr) => {
-    const percent = (xhr.loaded / xhr.total * 100).toFixed(0);
+    const percent = Math.min(100, (xhr.loaded / xhr.total * 100)).toFixed(0);
     infoDiv.innerText = `Loading point cloud: ${percent}%`;
 }, (error) => {
     infoDiv.innerText = "Error loading point cloud.";
