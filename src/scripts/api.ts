@@ -1,0 +1,103 @@
+declare global {
+  interface Window {
+    __ENV_API_BASE__?: string;
+    __ENV_API_KEY__?: string;
+  }
+}
+
+function getApiBase(): string {
+  if (import.meta.env.DEV) {
+    return '/api-proxy';
+  }
+  if (window.__ENV_API_BASE__) {
+    return window.__ENV_API_BASE__.replace(/\/+$/, '');
+  }
+  return 'https://api.00224466.xyz/roombuilder';
+}
+
+let apiKey = '';
+
+export function setApiKey(key: string): void {
+  apiKey = key;
+}
+
+function authHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (apiKey) {
+    headers['X-API-Key'] = apiKey;
+  }
+  return headers;
+}
+
+export async function login(password: string): Promise<boolean> {
+  const res = await fetch(`${getApiBase()}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  });
+  if (res.status === 401) return false;
+  if (!res.ok) throw new Error(`Login failed: ${res.status}`);
+  const data = await res.json();
+  return data.authenticated === true;
+}
+
+export interface CaptureListItem {
+  id: string;
+  folder: string;
+  raw_images: number;
+  preprocessed_images: number;
+}
+
+export interface CaptureDetail {
+  id: string;
+  folder: string;
+  raw_images: string[];
+  preprocessed_images: string[];
+  pointclouds: string[];
+}
+
+export interface PointCloudInfo {
+  filename: string;
+  size_bytes: number;
+  url: string;
+}
+
+export interface PointCloudsResponse {
+  capture_id: string;
+  pointclouds: PointCloudInfo[];
+}
+
+export async function fetchCaptures(): Promise<CaptureListItem[]> {
+  const res = await fetch(`${getApiBase()}/captures`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(`Failed to fetch captures: ${res.status}`);
+  const data = await res.json();
+  return data.captures;
+}
+
+export async function fetchCaptureDetail(captureId: string): Promise<CaptureDetail> {
+  const res = await fetch(`${getApiBase()}/captures/${captureId}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(`Failed to fetch capture detail: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchPointClouds(captureId: string): Promise<PointCloudInfo[]> {
+  const res = await fetch(`${getApiBase()}/captures/${captureId}/pointclouds`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(`Failed to fetch point clouds: ${res.status}`);
+  const data: PointCloudsResponse = await res.json();
+  return data.pointclouds;
+}
+
+export async function fetchPointCloudData(captureId: string, filename: string): Promise<ArrayBuffer> {
+  const res = await fetch(
+    `${getApiBase()}/captures/${captureId}/pointclouds/${filename}`,
+    { headers: authHeaders() },
+  );
+  if (!res.ok) throw new Error(`Failed to download point cloud: ${res.status}`);
+  return res.arrayBuffer();
+}

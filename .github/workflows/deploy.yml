@@ -32,6 +32,9 @@ jobs:
 
       - name: Build with Astro
         run: npm run build
+        env:
+          PUBLIC_API_KEY: ${{ secrets.PUBLIC_API_KEY }}
+          PUBLIC_API_BASE: ${{ secrets.PUBLIC_API_BASE }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

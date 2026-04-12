@@ -1,28 +1,85 @@
 ---
+import '../styles/global.css';
+const envApiKey = import.meta.env.PUBLIC_API_KEY ?? '';
+const envApiBase = import.meta.env.PUBLIC_API_BASE ?? '';
 ---
 <!DOCTYPE html>
 <html lang="de">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quest 3 Scan Viewer</title>
-    <style>
-        body { margin: 0; overflow: hidden; background-color: #1a1a1a; }
-        #info {
-            position: absolute;
-            top: 10px;
-            width: 100%;
-            text-align: center;
-            color: white;
-            font-family: sans-serif;
-            pointer-events: none;
-            text-shadow: 1px 1px 2px black;
-            z-index: 10;
-        }
-    </style>
+    <title>RoomBuilder · Point Cloud Viewer</title>
 </head>
 <body>
-    <div id="info">Loading point cloud...</div>
-    <script src="../scripts/renderer.ts"></script>
+    <div id="login-screen" class="login-screen hidden">
+        <div class="login-card">
+            <div class="login-brand">
+                <span class="logo">[RoomBuilder]</span>
+                <span class="subtitle">Point Cloud Viewer</span>
+            </div>
+            <form id="login-form" autocomplete="on">
+                <label class="login-label" for="login-password">Password</label>
+                <input
+                    id="login-password"
+                    type="password"
+                    class="login-input"
+                    placeholder="Enter password…"
+                    autocomplete="current-password"
+                    required
+                />
+                <div id="login-error" class="login-error hidden"></div>
+                <div class="login-row">
+                    <label class="login-remember">
+                        <input id="login-remember" type="checkbox" checked />
+                        Remember me
+                    </label>
+                    <button type="submit" id="login-btn" class="btn btn-accent login-btn">Login</button>
+                </div>
+            </form>
+            <div class="login-footer">&copy; 2026 Jonas Ludorf</div>
+        </div>
+    </div>
+
+    <div id="app-screen" class="app-layout hidden">
+        <header class="topbar">
+            <div class="topbar-brand">
+                <span class="logo">[RoomBuilder]</span>
+                <span class="subtitle">Point Cloud Viewer</span>
+            </div>
+            <div id="status" class="topbar-status"></div>
+            <div class="topbar-right">
+                <div class="topbar-footer">&copy; 2026 Jonas Ludorf</div>
+                <button id="logout-btn" class="btn btn-icon" title="Logout">&#x23FB;</button>
+            </div>
+        </header>
+        <div class="main-area">
+            <button id="sidebar-toggle" class="btn btn-icon sidebar-toggle-float" title="Toggle sidebar">&#9776;</button>
+            <aside id="sidebar" class="sidebar">
+                <div class="sidebar-header">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <button id="back-btn" class="btn btn-icon hidden" title="Back">&larr;</button>
+                        <h2>Sessions</h2>
+                    </div>
+                    <div class="sidebar-actions">
+                        <button id="refresh-btn" class="btn btn-icon" title="Refresh">&#8635;</button>
+                    </div>
+                </div>
+                <div class="sidebar-body">
+                    <div id="session-list"><div class="empty-state">No captures available.</div></div>
+                    <div id="pc-list" class="hidden"></div>
+                </div>
+            </aside>
+            <div id="viewer" class="viewer-container">
+                <div class="viewer-empty">Select a point cloud to view</div>
+            </div>
+        </div>
+    </div>
+
+    <script is:inline define:vars={{ envApiKey, envApiBase }}>
+        window.__ENV_API_KEY__ = envApiKey;
+        window.__ENV_API_BASE__ = envApiBase;
+    </script>
+    <script src="../scripts/app.ts"></script>
 </body>
 </html>
+
