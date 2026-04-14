@@ -57,8 +57,7 @@ const envApiBase = import.meta.env.PUBLIC_API_BASE ?? '';
             <aside id="sidebar" class="sidebar">
                 <div class="sidebar-header">
                     <div style="display:flex;align-items:center;gap:8px;">
-                        <button id="back-btn" class="btn btn-icon hidden" title="Back">&larr;</button>
-                        <h2>Sessions</h2>
+                        <h2>Point Clouds</h2>
                     </div>
                     <div class="sidebar-actions">
                         <button id="refresh-btn" class="btn btn-icon" title="Refresh">&#8635;</button>
@@ -66,11 +65,14 @@ const envApiBase = import.meta.env.PUBLIC_API_BASE ?? '';
                 </div>
                 <div class="sidebar-body">
                     <div id="session-list"><div class="empty-state">No captures available.</div></div>
-                    <div id="pc-list" class="hidden"></div>
                 </div>
             </aside>
             <div id="viewer" class="viewer-container">
                 <div class="viewer-empty">Select a point cloud to view</div>
+                <div id="viewer-loading" class="viewer-loading hidden">
+                    <div class="spinner-large"></div>
+                    <div id="viewer-progress" class="viewer-progress">0 %</div>
+                </div>
             </div>
         </div>
     </div>

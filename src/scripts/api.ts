@@ -93,11 +93,40 @@ export async function fetchPointClouds(captureId: string): Promise<PointCloudInf
   return data.pointclouds;
 }
 
-export async function fetchPointCloudData(captureId: string, filename: string): Promise<ArrayBuffer> {
+export async function fetchPointCloudData(
+  captureId: string,
+  filename: string,
+  onProgress?: (fraction: number) => void,
+): Promise<ArrayBuffer> {
   const res = await fetch(
     `${getApiBase()}/captures/${captureId}/pointclouds/${filename}`,
     { headers: authHeaders() },
   );
   if (!res.ok) throw new Error(`Failed to download point cloud: ${res.status}`);
-  return res.arrayBuffer();
+
+  const contentLength = res.headers.get('Content-Length');
+  if (!onProgress || !contentLength || !res.body) {
+    return res.arrayBuffer();
+  }
+
+  const total = parseInt(contentLength, 10);
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.length;
+    onProgress(received / total);
+  }
+
+  const buf = new Uint8Array(received);
+  let offset = 0;
+  for (const chunk of chunks) {
+    buf.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return buf.buffer;
 }

@@ -10,45 +10,33 @@ const loginError = document.getElementById('login-error')!;
 const loginBtn = document.getElementById('login-btn') as HTMLButtonElement;
 const loginRemember = document.getElementById('login-remember') as HTMLInputElement;
 const sessionList = document.getElementById('session-list')!;
-const pcList = document.getElementById('pc-list')!;
 const viewerContainer = document.getElementById('viewer')!;
 const statusEl = document.getElementById('status')!;
 const refreshBtn = document.getElementById('refresh-btn')!;
 const sidebarEl = document.getElementById('sidebar')!;
 const toggleBtn = document.getElementById('sidebar-toggle')!;
-const backBtn = document.getElementById('back-btn')!;
 const logoutBtn = document.getElementById('logout-btn')!;
 const viewerEmpty = viewerContainer.querySelector('.viewer-empty')!;
+const viewerLoading = document.getElementById('viewer-loading')!;
+const viewerProgress = document.getElementById('viewer-progress')!;
 
 const REMEMBER_KEY = 'rb_remember_pw';
 const SESSION_KEY = 'rb_logged_in';
 const SPINNER = '<div class="spinner"></div>';
 
 let viewerInitialised = false;
-let selectedCaptureId: string | null = null;
-let selectedPcFilename: string | null = null;
+let selectedPcKey: string | null = null;
 
 toggleBtn.addEventListener('click', () => {
   sidebarEl.classList.toggle('collapsed');
 });
 
 refreshBtn.addEventListener('click', () => {
-  if (selectedCaptureId) {
-    loadPointClouds(selectedCaptureId);
-  } else {
-    loadSessions();
-  }
-});
-
-backBtn.addEventListener('click', () => {
-  selectedCaptureId = null;
-  selectedPcFilename = null;
-  backBtn.classList.add('hidden');
-  pcList.classList.add('hidden');
-  sessionList.classList.remove('hidden');
-  setStatus('');
+  selectedPcKey = null;
   unloadPointCloud();
   viewerEmpty.classList.remove('hidden');
+  setStatus('');
+  loadSessions();
 });
 
 logoutBtn.addEventListener('click', () => {
@@ -141,9 +129,6 @@ function showApp(): void {
 
 async function loadSessions(): Promise<void> {
   sessionList.innerHTML = SPINNER;
-  pcList.classList.add('hidden');
-  backBtn.classList.add('hidden');
-  sessionList.classList.remove('hidden');
   setStatus('');
 
   try {
@@ -155,45 +140,28 @@ async function loadSessions(): Promise<void> {
     }
 
     sessionList.innerHTML = '';
-    captures.forEach((c) => renderSessionItem(c));
-  } catch {
-    sessionList.innerHTML = '<div class="empty-state">No captures available.</div>';
-  }
-}
 
-function renderSessionItem(capture: CaptureListItem): void {
-  const el = document.createElement('button');
-  el.className = 'list-item';
-  el.innerHTML = `
-    <div class="item-title">${capture.id}</div>
-    <div class="item-meta">${capture.preprocessed_images} preprocessed · ${capture.raw_images} raw</div>
-  `;
-  el.addEventListener('click', () => {
-    selectedCaptureId = capture.id;
-    loadPointClouds(capture.id);
-  });
-  sessionList.appendChild(el);
-}
+    const results = await Promise.all(
+      captures.map(async (c) => {
+        try {
+          const pcs = await fetchPointClouds(c.id);
+          return { capture: c, pcs };
+        } catch {
+          return { capture: c, pcs: [] as PointCloudInfo[] };
+        }
+      })
+    );
 
-async function loadPointClouds(captureId: string): Promise<void> {
-  sessionList.classList.add('hidden');
-  pcList.classList.remove('hidden');
-  backBtn.classList.remove('hidden');
-  pcList.innerHTML = SPINNER;
-  setStatus('');
-
-  try {
-    const pcs = await fetchPointClouds(captureId);
-
-    if (pcs.length === 0) {
-      pcList.innerHTML = '<div class="empty-state">No point clouds found for this session.</div>';
-      return;
+    for (const { capture, pcs } of results) {
+      if (pcs.length === 0) continue;
+      pcs.forEach((pc) => renderPcItem(capture.id, pc));
     }
 
-    pcList.innerHTML = '';
-    pcs.forEach((pc) => renderPcItem(captureId, pc));
+    if (sessionList.children.length === 0) {
+      sessionList.innerHTML = '<div class="empty-state">No point clouds available.</div>';
+    }
   } catch {
-    pcList.innerHTML = '<div class="empty-state">No point clouds available.</div>';
+    sessionList.innerHTML = '<div class="empty-state">No captures available.</div>';
   }
 }
 
@@ -202,11 +170,11 @@ function renderPcItem(captureId: string, pc: PointCloudInfo): void {
   el.className = 'list-item';
   const sizeMB = (pc.size_bytes / (1024 * 1024)).toFixed(1);
   el.innerHTML = `
-    <div class="item-title">${pc.filename}</div>
-    <div class="item-meta">${sizeMB} MB</div>
+    <div class="item-title">${captureId}</div>
+    <div class="item-meta">${pc.filename} · ${sizeMB} MB</div>
   `;
   el.addEventListener('click', () => selectPointCloud(captureId, pc, el));
-  pcList.appendChild(el);
+  sessionList.appendChild(el);
 }
 
 async function selectPointCloud(
@@ -214,8 +182,9 @@ async function selectPointCloud(
   pc: PointCloudInfo,
   el: HTMLButtonElement,
 ): Promise<void> {
-  if (selectedPcFilename === pc.filename) {
-    selectedPcFilename = null;
+  const pcKey = `${captureId}/${pc.filename}`;
+  if (selectedPcKey === pcKey) {
+    selectedPcKey = null;
     el.classList.remove('active');
     unloadPointCloud();
     viewerEmpty.classList.remove('hidden');
@@ -223,20 +192,26 @@ async function selectPointCloud(
     return;
   }
 
-  pcList.querySelectorAll('.list-item').forEach((item) => item.classList.remove('active'));
+  sessionList.querySelectorAll('.list-item').forEach((item) => item.classList.remove('active'));
   el.classList.add('active');
-  selectedPcFilename = pc.filename;
+  selectedPcKey = pcKey;
 
   setStatus('Downloading point cloud…');
   viewerEmpty.classList.add('hidden');
+  viewerProgress.textContent = '0 %';
+  viewerLoading.classList.remove('hidden');
   try {
-    const buffer = await fetchPointCloudData(captureId, pc.filename);
-    if (selectedPcFilename !== pc.filename) return;
+    const buffer = await fetchPointCloudData(captureId, pc.filename, (f) => {
+      viewerProgress.textContent = `${Math.round(f * 100)} %`;
+    });
+    if (selectedPcKey !== pcKey) return;
 
     loadPointCloudFromBuffer(buffer, (msg) => setStatus(msg));
     setStatus(`${pc.filename} loaded`);
   } catch (err: unknown) {
     setStatus(`Error: ${err instanceof Error ? err.message : err}`);
+  } finally {
+    viewerLoading.classList.add('hidden');
   }
 }
 

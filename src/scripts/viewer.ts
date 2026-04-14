@@ -22,8 +22,8 @@ export function initViewer(containerEl: HTMLElement): void {
   camera = new THREE.PerspectiveCamera(
     75,
     container.clientWidth / container.clientHeight,
-    0.1,
-    100
+    0.0001,
+    100000
   );
 
   renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -79,13 +79,13 @@ export function loadPointCloudFromBuffer(
   const radius = geometry.boundingSphere!.radius;
 
   if (radius > 0) {
-    camera.near = Math.max(0.001, radius / 1000);
-    camera.far = Math.max(100, radius * 100);
+    camera.near = 0.0001;
+    camera.far = 100000;
     camera.updateProjectionMatrix();
 
     controls.target.set(0, 0, 0);
-    controls.minDistance = radius * 0.1;
-    controls.maxDistance = radius * 10;
+    controls.minDistance = 0;
+    controls.maxDistance = Infinity;
     controls.zoomSpeed = 3.0;
 
     camera.position.set(0, 0, radius * 2.0);

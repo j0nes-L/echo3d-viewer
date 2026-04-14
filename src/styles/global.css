@@ -248,6 +248,12 @@ html, body {
 .list-item.active { border-color: var(--accent); background: rgba(108, 92, 231, 0.1); }
 .item-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; word-break: break-all; }
 .item-meta { font-size: 11px; color: var(--text-secondary); }
+.session-group-title {
+    font-size: 11px; font-weight: 600; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 12px 4px 4px; margin-bottom: 2px;
+}
+.session-group-title:first-child { padding-top: 0; }
 .empty-state { text-align: center; padding: 32px 16px; color: var(--text-muted); font-size: 13px; }
 
 .viewer-container { flex: 1; position: relative; background: var(--bg-primary); overflow: hidden; }
@@ -267,6 +273,23 @@ html, body {
     border-top-color: var(--accent);
     border-radius: 50%;
     animation: spin 0.7s linear infinite;
+}
+.spinner-large {
+    width: 48px;
+    height: 48px;
+    border: 4px solid var(--border-color);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
+.viewer-loading {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+    background: rgba(13, 13, 15, 0.6);
+    z-index: 10;
+}
+.viewer-progress {
+    font-size: 13px; color: var(--text-secondary); font-variant-numeric: tabular-nums;
 }
 
 @keyframes spin {
