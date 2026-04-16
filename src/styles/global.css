@@ -234,8 +234,10 @@ html, body {
 .btn:hover { background: var(--bg-card-hover); border-color: var(--text-muted); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-icon { width: 32px; height: 32px; padding: 0; font-size: 16px; }
+.btn-download { font-size: 18px; width: 28px; height: 28px; }
 .btn-accent { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn-accent:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
 
 .list-item {
     display: block; width: 100%; background: var(--bg-card);

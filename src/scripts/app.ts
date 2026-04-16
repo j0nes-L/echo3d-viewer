@@ -1,6 +1,6 @@
 import { setApiKey, login, fetchCaptures, fetchPointClouds, fetchPointCloudData } from './api';
 import type { CaptureListItem, PointCloudInfo } from './api';
-import { initViewer, loadPointCloudFromBuffer, unloadPointCloud, setPointSize, hasScalarScale } from './viewer';
+import { initViewer, loadPointCloudFromBuffer, unloadPointCloud, setPointSize, hasScalarScale, getPointCount } from './viewer';
 
 const loginScreen = document.getElementById('login-screen')!;
 const appScreen = document.getElementById('app-screen')!;
@@ -21,10 +21,31 @@ const viewerLoading = document.getElementById('viewer-loading')!;
 const viewerProgress = document.getElementById('viewer-progress')!;
 const pointSizeControl = document.getElementById('point-size-control')!;
 const pointSizeSlider = document.getElementById('point-size-slider') as HTMLInputElement;
+const downloadBtn = document.getElementById('download-btn')!;
+
+let lastLoadedBuffer: ArrayBuffer | null = null;
+let lastLoadedFilename: string | null = null;
 
 pointSizeSlider.addEventListener('input', () => {
   setPointSize(parseFloat(pointSizeSlider.value));
 });
+
+downloadBtn.addEventListener('click', () => {
+  if (!lastLoadedBuffer) return;
+  const blob = new Blob([lastLoadedBuffer], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.style.display = 'none';
+  a.href = url;
+  a.download = lastLoadedFilename || 'pointcloud.ply';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
+});
+
 
 const REMEMBER_KEY = 'rb_remember_pw';
 const SESSION_KEY = 'rb_logged_in';
@@ -39,6 +60,8 @@ toggleBtn.addEventListener('click', () => {
 
 refreshBtn.addEventListener('click', () => {
   selectedPcKey = null;
+  lastLoadedBuffer = null;
+  lastLoadedFilename = null;
   unloadPointCloud();
   pointSizeControl.classList.add('hidden');
   viewerEmpty.classList.remove('hidden');
@@ -121,7 +144,6 @@ function showApp(): void {
   loginScreen.classList.add('hidden');
   appScreen.classList.remove('hidden');
 
-  // Auto-collapse sidebar on mobile
   if (window.innerWidth <= 768) {
     sidebarEl.classList.add('collapsed');
   }
@@ -183,7 +205,7 @@ function renderPcItem(captureId: string, pc: PointCloudInfo): void {
   const sizeMB = (pc.size_bytes / (1024 * 1024)).toFixed(1);
   el.innerHTML = `
     <div class="item-title">${captureId}</div>
-    <div class="item-meta">${pc.filename} · ${sizeMB} MB</div>
+    <div class="item-meta">${sizeMB} MB</div>
   `;
   el.addEventListener('click', () => selectPointCloud(captureId, pc, el));
   sessionList.appendChild(el);
@@ -196,12 +218,6 @@ async function selectPointCloud(
 ): Promise<void> {
   const pcKey = `${captureId}/${pc.filename}`;
   if (selectedPcKey === pcKey) {
-    selectedPcKey = null;
-    el.classList.remove('active');
-    unloadPointCloud();
-    pointSizeControl.classList.add('hidden');
-    viewerEmpty.classList.remove('hidden');
-    setStatus('');
     return;
   }
 
@@ -209,7 +225,6 @@ async function selectPointCloud(
   el.classList.add('active');
   selectedPcKey = pcKey;
 
-  // Auto-close sidebar on mobile
   if (window.innerWidth <= 768) {
     sidebarEl.classList.add('collapsed');
   }
@@ -225,7 +240,21 @@ async function selectPointCloud(
     if (selectedPcKey !== pcKey) return;
 
     loadPointCloudFromBuffer(buffer, (msg) => setStatus(msg));
+    lastLoadedBuffer = buffer;
+    lastLoadedFilename = pc.filename;
     pointSizeControl.classList.remove('hidden');
+
+    const count = getPointCount();
+    const countStr = count >= 1_000_000
+      ? `${(count / 1_000_000).toFixed(1)}M points`
+      : count >= 1_000
+        ? `${(count / 1_000).toFixed(0)}K points`
+        : `${count} points`;
+    const metaEl = el.querySelector('.item-meta');
+    if (metaEl) {
+      const sizeMB = (pc.size_bytes / (1024 * 1024)).toFixed(1);
+      metaEl.textContent = `${sizeMB} MB · ${countStr}`;
+    }
 
     if (hasScalarScale()) {
       pointSizeSlider.min = '0.1';
