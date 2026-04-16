@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
 
-const POINT_SIZE = 0.005;
+const DEFAULT_POINT_SIZE = 0.005;
 const BACKGROUND_COLOR = 0x111111;
 
 let scene: THREE.Scene;
@@ -12,6 +12,8 @@ let controls: OrbitControls;
 let currentPoints: THREE.Points | null = null;
 let animationId: number | null = null;
 let container: HTMLElement;
+let pointSizeMultiplier = 1.0;
+let hasPerPointScale = false;
 
 export function initViewer(containerEl: HTMLElement): void {
   container = containerEl;
@@ -58,17 +60,59 @@ export function loadPointCloudFromBuffer(
   onProgress?: (msg: string) => void
 ): void {
   unloadPointCloud();
+  pointSizeMultiplier = 1.0;
 
   onProgress?.('Parsing point cloud…');
 
   const loader = new PLYLoader();
   const geometry = loader.parse(buffer);
 
-  const material = new THREE.PointsMaterial({
-    size: POINT_SIZE,
-    vertexColors: true,
-    sizeAttenuation: true,
-  });
+  hasPerPointScale = geometry.hasAttribute('scalar_scale');
+
+  let material: THREE.Material;
+
+  if (hasPerPointScale) {
+    const scaleAttr = geometry.getAttribute('scalar_scale');
+    const count = scaleAttr.count;
+    const sizes = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+      sizes[i] = Math.exp(scaleAttr.getX(i));
+    }
+    geometry.setAttribute('pointScale', new THREE.BufferAttribute(sizes, 1));
+
+    const hasColors = geometry.hasAttribute('color');
+
+    material = new THREE.ShaderMaterial({
+      uniforms: {
+        uSizeMultiplier: { value: 1.0 },
+      },
+      vertexShader: `
+        attribute float pointScale;
+        ${hasColors ? 'varying vec3 vColor;' : ''}
+        uniform float uSizeMultiplier;
+        void main() {
+          ${hasColors ? 'vColor = color;' : ''}
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = pointScale * uSizeMultiplier * (300.0 / -mvPosition.z);
+          gl_PointSize = max(gl_PointSize, 1.0);
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        ${hasColors ? 'varying vec3 vColor;' : ''}
+        void main() {
+          ${hasColors ? 'gl_FragColor = vec4(vColor, 1.0);' : 'gl_FragColor = vec4(1.0);'}
+        }
+      `,
+      vertexColors: hasColors,
+    });
+  } else {
+    material = new THREE.PointsMaterial({
+      size: DEFAULT_POINT_SIZE,
+      vertexColors: true,
+      sizeAttenuation: true,
+    });
+  }
 
   geometry.center();
   const points = new THREE.Points(geometry, material);
@@ -120,7 +164,15 @@ export function disposeViewer(): void {
 }
 
 export function setPointSize(size: number): void {
-  if (currentPoints && currentPoints.material instanceof THREE.PointsMaterial) {
+  if (!currentPoints) return;
+  if (hasPerPointScale && currentPoints.material instanceof THREE.ShaderMaterial) {
+    currentPoints.material.uniforms.uSizeMultiplier.value = size;
+  } else if (currentPoints.material instanceof THREE.PointsMaterial) {
     currentPoints.material.size = size;
   }
 }
+
+export function hasScalarScale(): boolean {
+  return hasPerPointScale;
+}
+

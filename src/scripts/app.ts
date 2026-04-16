@@ -1,6 +1,6 @@
 import { setApiKey, login, fetchCaptures, fetchPointClouds, fetchPointCloudData } from './api';
 import type { CaptureListItem, PointCloudInfo } from './api';
-import { initViewer, loadPointCloudFromBuffer, unloadPointCloud, setPointSize } from './viewer';
+import { initViewer, loadPointCloudFromBuffer, unloadPointCloud, setPointSize, hasScalarScale } from './viewer';
 
 const loginScreen = document.getElementById('login-screen')!;
 const appScreen = document.getElementById('app-screen')!;
@@ -226,7 +226,19 @@ async function selectPointCloud(
 
     loadPointCloudFromBuffer(buffer, (msg) => setStatus(msg));
     pointSizeControl.classList.remove('hidden');
-    pointSizeSlider.value = '0.005';
+
+    if (hasScalarScale()) {
+      pointSizeSlider.min = '0.1';
+      pointSizeSlider.max = '5';
+      pointSizeSlider.step = '0.1';
+      pointSizeSlider.value = '1';
+    } else {
+      pointSizeSlider.min = '0.001';
+      pointSizeSlider.max = '0.05';
+      pointSizeSlider.step = '0.001';
+      pointSizeSlider.value = '0.005';
+    }
+
     setStatus(`${pc.filename} loaded`);
   } catch (err: unknown) {
     setStatus(`Error: ${err instanceof Error ? err.message : err}`);
