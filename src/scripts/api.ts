@@ -65,6 +65,22 @@ export interface PointCloudInfo {
 export interface PointCloudsResponse {
   capture_id: string;
   pointclouds: PointCloudInfo[];
+  chunks: PointCloudInfo[];
+  draco_chunks: PointCloudInfo[];
+}
+
+export interface ResolvedPointCloud {
+  view: PointCloudInfo;
+  download: PointCloudInfo;
+}
+
+export function resolvePointCloud(resp: PointCloudsResponse): ResolvedPointCloud | null {
+  const ply = resp.pointclouds.find(p => p.filename.endsWith('.ply'));
+  if (!ply) return null;
+  return {
+    view: ply,
+    download: ply,
+  };
 }
 
 export async function fetchCaptures(): Promise<CaptureListItem[]> {
@@ -84,13 +100,12 @@ export async function fetchCaptureDetail(captureId: string): Promise<CaptureDeta
   return res.json();
 }
 
-export async function fetchPointClouds(captureId: string): Promise<PointCloudInfo[]> {
+export async function fetchPointClouds(captureId: string): Promise<PointCloudsResponse> {
   const res = await fetch(`${getApiBase()}/captures/${captureId}/pointclouds`, {
     headers: authHeaders(),
   });
   if (!res.ok) throw new Error(`Failed to fetch point clouds: ${res.status}`);
-  const data: PointCloudsResponse = await res.json();
-  return data.pointclouds;
+  return res.json();
 }
 
 export async function fetchPointCloudData(

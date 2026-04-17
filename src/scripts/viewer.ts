@@ -24,6 +24,7 @@ const FLY_SPEED_BASE = 1.0;
 let flySpeed = FLY_SPEED_BASE;
 let clockDelta = 0;
 const clock = new THREE.Clock();
+let rightMouseDown = false;
 
 export function initViewer(containerEl: HTMLElement): void {
   container = containerEl;
@@ -54,8 +55,19 @@ export function initViewer(containerEl: HTMLElement): void {
 
   const FLY_KEYS = new Set(['w', 'a', 's', 'd', 'q', 'e', ' ']);
 
+  renderer.domElement.addEventListener('mousedown', (e) => {
+    if (e.button === 2) rightMouseDown = true;
+  });
+  renderer.domElement.addEventListener('mouseup', (e) => {
+    if (e.button === 2) {
+      rightMouseDown = false;
+      if (flyMode) exitFlyMode();
+    }
+  });
+  renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
+
   renderer.domElement.addEventListener('mousemove', (e) => {
-    if (!flyMode) return;
+    if (!flyMode || !rightMouseDown) return;
     flyYaw -= e.movementX * 0.002;
     flyPitch -= e.movementY * 0.002;
     flyPitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, flyPitch));
@@ -66,7 +78,7 @@ export function initViewer(containerEl: HTMLElement): void {
     const key = e.key.toLowerCase();
     flyKeys[key] = true;
     if (key === 'shift') flySpeed = FLY_SPEED_BASE * 3;
-    if (FLY_KEYS.has(key) && !flyMode) {
+    if (FLY_KEYS.has(key) && rightMouseDown && !flyMode) {
       enterFlyMode();
     }
   });
@@ -90,7 +102,6 @@ function enterFlyMode(): void {
   const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
   flyYaw = euler.y;
   flyPitch = euler.x;
-  renderer.domElement.requestPointerLock();
 }
 
 function exitFlyMode(): void {
@@ -99,7 +110,6 @@ function exitFlyMode(): void {
   const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
   controls.target.copy(camera.position).add(dir.multiplyScalar(2));
   controls.update();
-  document.exitPointerLock();
 }
 
 function updateFlyCameraRotation(): void {
@@ -140,17 +150,32 @@ export function getPointCount(): number {
   return lastPointCount;
 }
 
-export function loadPointCloudFromBuffer(
+export async function loadPointCloudFromBuffer(
   buffer: ArrayBuffer,
-  onProgress?: (msg: string) => void
-): void {
+  onProgress?: (msg: string) => void,
+): Promise<void> {
   unloadPointCloud();
   pointSizeMultiplier = 1.0;
 
-  onProgress?.('Parsing point cloud…');
+  onProgress?.('Parsing geometry…');
 
   const loader = new PLYLoader();
   const geometry = loader.parse(buffer);
+
+  onProgress?.('Processing colors…');
+
+  if (geometry.hasAttribute('color')) {
+    const colorAttr = geometry.getAttribute('color');
+    const arr = colorAttr.array as Float32Array;
+    let maxVal = 0;
+    const len = Math.min(arr.length, 3000);
+    for (let i = 0; i < len; i++) { if (arr[i] > maxVal) maxVal = arr[i]; }
+    if (maxVal > 1.5) {
+      const scale = 1 / 255;
+      for (let i = 0; i < arr.length; i++) arr[i] *= scale;
+      colorAttr.needsUpdate = true;
+    }
+  }
 
   hasPerPointScale = geometry.hasAttribute('scalar_scale');
 
@@ -165,8 +190,10 @@ export function loadPointCloudFromBuffer(
   }
 
   geometry.center();
+  onProgress?.('Aligning…');
   autoAlignGeometry(geometry);
 
+  onProgress?.('Building renderer…');
   const hasColors = geometry.hasAttribute('color');
   const material = buildMaterial(hasColors);
 

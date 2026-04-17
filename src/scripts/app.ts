@@ -1,5 +1,5 @@
-import { setApiKey, login, fetchCaptures, fetchPointClouds, fetchPointCloudData } from './api';
-import type { CaptureListItem, PointCloudInfo } from './api';
+import { setApiKey, login, fetchCaptures, fetchPointClouds, fetchPointCloudData, resolvePointCloud } from './api';
+import type { CaptureListItem, PointCloudInfo, ResolvedPointCloud } from './api';
 import { initViewer, loadPointCloudFromBuffer, unloadPointCloud, setPointSize, hasScalarScale, getPointCount } from './viewer';
 
 const loginScreen = document.getElementById('login-screen')!;
@@ -25,25 +25,45 @@ const downloadBtn = document.getElementById('download-btn')!;
 
 let lastLoadedBuffer: ArrayBuffer | null = null;
 let lastLoadedFilename: string | null = null;
+let lastDownloadCaptureId: string | null = null;
+let lastDownloadPc: PointCloudInfo | null = null;
+let prefetchedDownloadBuffer: ArrayBuffer | null = null;
 
 pointSizeSlider.addEventListener('input', () => {
   setPointSize(parseFloat(pointSizeSlider.value));
 });
 
-downloadBtn.addEventListener('click', () => {
-  if (!lastLoadedBuffer) return;
-  const blob = new Blob([lastLoadedBuffer], { type: 'application/octet-stream' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.style.display = 'none';
-  a.href = url;
-  a.download = lastLoadedFilename || 'pointcloud.ply';
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => {
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, 100);
+downloadBtn.addEventListener('click', async () => {
+  if (!lastDownloadCaptureId || !lastDownloadPc) return;
+  const btn = downloadBtn as HTMLButtonElement;
+  btn.disabled = true;
+  const origText = btn.textContent;
+  try {
+    let buffer: ArrayBuffer;
+    if (prefetchedDownloadBuffer) {
+      buffer = prefetchedDownloadBuffer;
+    } else {
+      btn.textContent = 'Downloading…';
+      buffer = await fetchPointCloudData(lastDownloadCaptureId, lastDownloadPc.filename);
+    }
+    const blob = new Blob([buffer], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = lastDownloadPc.filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+  } catch (err) {
+    setStatus(`Download error: ${err instanceof Error ? err.message : err}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = origText;
+  }
 });
 
 
@@ -62,6 +82,9 @@ refreshBtn.addEventListener('click', () => {
   selectedPcKey = null;
   lastLoadedBuffer = null;
   lastLoadedFilename = null;
+  lastDownloadCaptureId = null;
+  lastDownloadPc = null;
+  prefetchedDownloadBuffer = null;
   unloadPointCloud();
   pointSizeControl.classList.add('hidden');
   viewerEmpty.classList.remove('hidden');
@@ -178,17 +201,18 @@ async function loadSessions(): Promise<void> {
     const results = await Promise.all(
       captures.map(async (c) => {
         try {
-          const pcs = await fetchPointClouds(c.id);
-          return { capture: c, pcs };
+          const resp = await fetchPointClouds(c.id);
+          const resolved = resolvePointCloud(resp);
+          return { capture: c, resolved };
         } catch {
-          return { capture: c, pcs: [] as PointCloudInfo[] };
+          return { capture: c, resolved: null as ResolvedPointCloud | null };
         }
       })
     );
 
-    for (const { capture, pcs } of results) {
-      if (pcs.length === 0) continue;
-      pcs.forEach((pc) => renderPcItem(capture.id, pc));
+    for (const { capture, resolved } of results) {
+      if (!resolved) continue;
+      renderPcItem(capture.id, resolved);
     }
 
     if (sessionList.children.length === 0) {
@@ -199,23 +223,24 @@ async function loadSessions(): Promise<void> {
   }
 }
 
-function renderPcItem(captureId: string, pc: PointCloudInfo): void {
+function renderPcItem(captureId: string, resolved: ResolvedPointCloud): void {
   const el = document.createElement('button');
   el.className = 'list-item';
-  const sizeMB = (pc.size_bytes / (1024 * 1024)).toFixed(1);
+  const sizeMB = (resolved.view.size_bytes / (1024 * 1024)).toFixed(1);
   el.innerHTML = `
     <div class="item-title">${captureId}</div>
     <div class="item-meta">${sizeMB} MB</div>
   `;
-  el.addEventListener('click', () => selectPointCloud(captureId, pc, el));
+  el.addEventListener('click', () => selectPointCloud(captureId, resolved, el));
   sessionList.appendChild(el);
 }
 
 async function selectPointCloud(
   captureId: string,
-  pc: PointCloudInfo,
+  resolved: ResolvedPointCloud,
   el: HTMLButtonElement,
 ): Promise<void> {
+  const pc = resolved.view;
   const pcKey = `${captureId}/${pc.filename}`;
   if (selectedPcKey === pcKey) {
     return;
@@ -235,14 +260,26 @@ async function selectPointCloud(
   viewerLoading.classList.remove('hidden');
   try {
     const buffer = await fetchPointCloudData(captureId, pc.filename, (f) => {
-      viewerProgress.textContent = `${Math.round(f * 100)} %`;
+      viewerProgress.textContent = `Downloading… ${Math.round(f * 100)} %`;
     });
     if (selectedPcKey !== pcKey) return;
 
-    loadPointCloudFromBuffer(buffer, (msg) => setStatus(msg));
+    viewerProgress.textContent = 'Parsing…';
+
+    await new Promise(r => setTimeout(r, 50));
+    await loadPointCloudFromBuffer(buffer, (msg) => {
+      viewerProgress.textContent = msg;
+      setStatus(msg);
+    });
     lastLoadedBuffer = buffer;
     lastLoadedFilename = pc.filename;
+    lastDownloadCaptureId = captureId;
+    lastDownloadPc = resolved.download;
+    prefetchedDownloadBuffer = buffer;
     pointSizeControl.classList.remove('hidden');
+
+    const dlSizeMB = (resolved.download.size_bytes / (1024 * 1024)).toFixed(0);
+    (downloadBtn as HTMLButtonElement).textContent = `⤓ .ply (${dlSizeMB} MB)`;
 
     const count = getPointCount();
     const countStr = count >= 1_000_000
@@ -270,6 +307,8 @@ async function selectPointCloud(
 
     setStatus(`${pc.filename} loaded`);
   } catch (err: unknown) {
+    selectedPcKey = null;
+    el.classList.remove('active');
     setStatus(`Error: ${err instanceof Error ? err.message : err}`);
   } finally {
     viewerLoading.classList.add('hidden');
