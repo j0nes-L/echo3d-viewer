@@ -25,6 +25,7 @@ let flySpeed = FLY_SPEED_BASE;
 let clockDelta = 0;
 const clock = new THREE.Clock();
 let rightMouseDown = false;
+let gridMesh: THREE.Mesh | null = null;
 
 export function initViewer(containerEl: HTMLElement): void {
   container = containerEl;
@@ -152,6 +153,12 @@ export function unloadPointCloud(): void {
     }
     currentPoints = null;
   }
+  if (gridMesh) {
+    scene.remove(gridMesh);
+    gridMesh.geometry.dispose();
+    (gridMesh.material as THREE.Material).dispose();
+    gridMesh = null;
+  }
   lastPointCount = 0;
 }
 
@@ -198,9 +205,17 @@ export async function loadPointCloudFromBuffer(
     geometry.setAttribute('pointScale', new THREE.BufferAttribute(sizes, 1));
   }
 
-  geometry.center();
   onProgress?.('Aligning…');
   autoAlignGeometry(geometry);
+
+  geometry.computeBoundingBox();
+  const minY = geometry.boundingBox!.min.y;
+  const posAttr2 = geometry.getAttribute('position');
+  const arr2 = posAttr2.array as Float32Array;
+  for (let i = 1; i < arr2.length; i += 3) {
+    arr2[i] -= minY;
+  }
+  posAttr2.needsUpdate = true;
 
   onProgress?.('Building renderer…');
   const hasColors = geometry.hasAttribute('color');
@@ -217,17 +232,21 @@ export async function loadPointCloudFromBuffer(
 
   if (radius > 0) {
     flySpeed = radius * 0.5;
+    updateGrid(radius);
 
     camera.near = radius * 0.00001;
     camera.far = radius * 100;
     camera.updateProjectionMatrix();
 
-    controls.target.set(0, 0, 0);
+    geometry.computeBoundingBox();
+    const centerY = geometry.boundingBox ? (geometry.boundingBox.max.y + geometry.boundingBox.min.y) / 2 : 0;
+    const maxY = geometry.boundingBox ? geometry.boundingBox.max.y : radius;
+    controls.target.set(0, centerY, 0);
     controls.minDistance = 0;
     controls.maxDistance = radius * 10;
     controls.zoomSpeed = 3.0;
 
-    camera.position.set(0, 0, radius * 2.0);
+    camera.position.set(0, Math.max(centerY, maxY * 0.5), radius * 2.0);
     controls.update();
     controls.saveState();
   }
@@ -239,42 +258,91 @@ function autoAlignGeometry(geometry: THREE.BufferGeometry): void {
   const posAttr = geometry.getAttribute('position');
   const arr = posAttr.array as Float32Array;
   const n = posAttr.count;
-  if (n < 10) return;
+  for (let i = 0; i < n; i++) {
+    arr[i * 3 + 2] = -arr[i * 3 + 2];
+  }
+
+  geometry.computeBoundingBox();
+  const bb = geometry.boundingBox!;
+  const cx = (bb.max.x + bb.min.x) / 2;
+  const cy = (bb.max.y + bb.min.y) / 2;
+  const cz = (bb.max.z + bb.min.z) / 2;
+  for (let i = 0; i < n; i++) {
+    arr[i * 3] -= cx;
+    arr[i * 3 + 1] -= cy;
+    arr[i * 3 + 2] -= cz;
+  }
 
   const step = Math.max(1, Math.floor(n / 50000));
-  let cx = 0, cy = 0, cz = 0, cnt = 0;
+  let cov_xx = 0, cov_xz = 0, cov_zz = 0;
   for (let i = 0; i < n; i += step) {
-    cx += arr[i*3]; cy += arr[i*3+1]; cz += arr[i*3+2]; cnt++;
-  }
-  cx /= cnt; cy /= cnt; cz /= cnt;
-
-  let xx = 0, xy = 0, xz = 0, yy = 0, yz = 0, zz = 0;
-  for (let i = 0; i < n; i += step) {
-    const dx = arr[i*3]-cx, dy = arr[i*3+1]-cy, dz = arr[i*3+2]-cz;
-    xx += dx*dx; xy += dx*dy; xz += dx*dz;
-    yy += dy*dy; yz += dy*dz; zz += dz*dz;
+    const x = arr[i * 3], z = arr[i * 3 + 2];
+    cov_xx += x * x;
+    cov_xz += x * z;
+    cov_zz += z * z;
   }
 
-  const cov = [xx,xy,xz, xy,yy,yz, xz,yz,zz];
-  const mv = (m: number[], v: number[]) => [m[0]*v[0]+m[1]*v[1]+m[2]*v[2], m[3]*v[0]+m[4]*v[1]+m[5]*v[2], m[6]*v[0]+m[7]*v[1]+m[8]*v[2]];
-  const nm = (v: number[]) => { const l = Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]); return l>0?[v[0]/l,v[1]/l,v[2]/l]:[0,1,0]; };
-  const pi = (m: number[]) => { let v=[0.577,0.577,0.577]; for(let i=0;i<50;i++) v=nm(mv(m,v)); return v; };
-
-  const e1 = pi(cov);
-  const l1 = mv(cov,e1).reduce((s,x,i)=>s+x*e1[i],0);
-  const c2 = cov.map((v,idx)=>{ const r=Math.floor(idx/3),c=idx%3; return v-l1*e1[r]*e1[c]; });
-  const e2 = pi(c2);
-
-  let up = nm([e1[1]*e2[2]-e1[2]*e2[1], e1[2]*e2[0]-e1[0]*e2[2], e1[0]*e2[1]-e1[1]*e2[0]]);
-  if (up[1]<0) up=[-up[0],-up[1],-up[2]];
-
-  const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(up[0],up[1],up[2]), new THREE.Vector3(0,1,0));
-  const v = new THREE.Vector3();
+  const angle = 0.5 * Math.atan2(2 * cov_xz, cov_xx - cov_zz);
+  const cosA = Math.cos(-angle), sinA = Math.sin(-angle);
   for (let i = 0; i < n; i++) {
-    v.set(arr[i*3], arr[i*3+1], arr[i*3+2]).applyQuaternion(quat);
-    arr[i*3] = v.x; arr[i*3+1] = v.y; arr[i*3+2] = v.z;
+    const x = arr[i * 3], z = arr[i * 3 + 2];
+    arr[i * 3] = x * cosA - z * sinA;
+    arr[i * 3 + 2] = x * sinA + z * cosA;
   }
+
   posAttr.needsUpdate = true;
+}
+
+function updateGrid(radius: number): void {
+  if (gridMesh) {
+    scene.remove(gridMesh);
+    gridMesh.geometry.dispose();
+    (gridMesh.material as THREE.Material).dispose();
+    gridMesh = null;
+  }
+
+  const gridScale = radius * 0.5;
+  const gridMat = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    uniforms: {
+      uScale: { value: gridScale },
+    },
+    vertexShader: `
+      varying vec3 vWorldPos;
+      void main() {
+        vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+        gl_Position = projectionMatrix * viewMatrix * vec4(vWorldPos, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float uScale;
+      varying vec3 vWorldPos;
+      void main() {
+        vec2 coord = vWorldPos.xz / uScale;
+        vec2 grid = abs(fract(coord - 0.5) - 0.5) / fwidth(coord);
+        float line = min(grid.x, grid.y);
+        float alpha = 1.0 - min(line, 1.0);
+
+        // Fade out with distance from origin
+        float dist = length(vWorldPos.xz);
+        float fade = 1.0 - smoothstep(uScale * 3.0, uScale * 8.0, dist);
+
+        alpha *= fade * 0.25;
+        if (alpha < 0.005) discard;
+        gl_FragColor = vec4(vec3(0.4), alpha);
+      }
+    `,
+  });
+
+  const planeSize = radius * 200;
+  const planeGeo = new THREE.PlaneGeometry(planeSize, planeSize);
+  planeGeo.rotateX(-Math.PI / 2);
+  gridMesh = new THREE.Mesh(planeGeo, gridMat);
+  gridMesh.position.y = 0;
+  gridMesh.renderOrder = -1;
+  scene.add(gridMesh);
 }
 
 function onResize(): void {

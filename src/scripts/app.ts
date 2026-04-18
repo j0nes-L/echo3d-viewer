@@ -1,4 +1,4 @@
-import { setApiKey, login, fetchCaptures, fetchPointClouds, fetchPointCloudData, fetchColmapZip, resolvePointCloud } from './api';
+import { setApiKey, login, fetchCaptures, fetchPointClouds, fetchPointCloudData, fetchColmapZip, fetchMeshGlb, checkMeshAvailability, resolvePointCloud } from './api';
 import type { CaptureListItem, PointCloudInfo, ResolvedPointCloud } from './api';
 import { initViewer, loadPointCloudFromBuffer, unloadPointCloud, setPointSize, hasScalarScale, getPointCount } from './viewer';
 
@@ -23,6 +23,7 @@ const pointSizeControl = document.getElementById('point-size-control')!;
 const pointSizeSlider = document.getElementById('point-size-slider') as HTMLInputElement;
 const downloadBtn = document.getElementById('download-btn')!;
 const downloadColmapBtn = document.getElementById('download-colmap-btn')!;
+const downloadMeshBtn = document.getElementById('download-mesh-btn')!;
 
 let lastLoadedBuffer: ArrayBuffer | null = null;
 let lastLoadedFilename: string | null = null;
@@ -31,6 +32,8 @@ let lastDownloadPc: PointCloudInfo | null = null;
 let prefetchedDownloadBuffer: ArrayBuffer | null = null;
 let colmapAvailable = false;
 let colmapSizeBytes: number | null = null;
+let meshAvailable = false;
+let meshSizeBytes: number | null = null;
 
 pointSizeSlider.addEventListener('input', () => {
   setPointSize(parseFloat(pointSizeSlider.value));
@@ -99,6 +102,36 @@ downloadColmapBtn.addEventListener('click', async () => {
   }
 });
 
+downloadMeshBtn.addEventListener('click', async () => {
+  if (!lastDownloadCaptureId || !meshAvailable) return;
+  const btn = downloadMeshBtn as HTMLButtonElement;
+  btn.disabled = true;
+  const origText = btn.textContent;
+  try {
+    btn.textContent = 'Downloading… 0%';
+    const buffer = await fetchMeshGlb(lastDownloadCaptureId, (f) => {
+      btn.textContent = `Downloading… ${Math.round(f * 100)}%`;
+    }, meshSizeBytes);
+    const blob = new Blob([buffer], { type: 'model/gltf-binary' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = `Capture_${lastDownloadCaptureId}_mesh.glb`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+  } catch (err) {
+    setStatus(`Mesh download error: ${err instanceof Error ? err.message : err}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = origText;
+  }
+});
+
 
 const REMEMBER_KEY = 'rb_remember_pw';
 const SESSION_KEY = 'rb_logged_in';
@@ -112,19 +145,6 @@ toggleBtn.addEventListener('click', () => {
 });
 
 refreshBtn.addEventListener('click', () => {
-  selectedPcKey = null;
-  lastLoadedBuffer = null;
-  lastLoadedFilename = null;
-  lastDownloadCaptureId = null;
-  lastDownloadPc = null;
-  prefetchedDownloadBuffer = null;
-  colmapAvailable = false;
-  colmapSizeBytes = null;
-  downloadColmapBtn.classList.add('hidden');
-  unloadPointCloud();
-  pointSizeControl.classList.add('hidden');
-  viewerEmpty.classList.remove('hidden');
-  setStatus('');
   loadSessions();
 });
 
@@ -249,7 +269,13 @@ async function loadSessions(): Promise<void> {
 
     for (const { capture, resolved } of results) {
       if (!resolved) continue;
-      renderPcItem(capture.id, resolved);
+      const el = renderPcItem(capture.id, resolved);
+      const pcKey = `${capture.id}/${resolved.view.filename}`;
+      if (selectedPcKey === pcKey) {
+        el.classList.add('active');
+        // Update download buttons for currently loaded capture
+        updateDownloadButtons(capture.id, resolved);
+      }
     }
 
     if (sessionList.children.length === 0) {
@@ -260,7 +286,7 @@ async function loadSessions(): Promise<void> {
   }
 }
 
-function renderPcItem(captureId: string, resolved: ResolvedPointCloud): void {
+function renderPcItem(captureId: string, resolved: ResolvedPointCloud): HTMLButtonElement {
   const el = document.createElement('button');
   el.className = 'list-item';
   const sizeMB = (resolved.view.size_bytes / (1024 * 1024)).toFixed(1);
@@ -270,6 +296,7 @@ function renderPcItem(captureId: string, resolved: ResolvedPointCloud): void {
   `;
   el.addEventListener('click', () => selectPointCloud(captureId, resolved, el));
   sessionList.appendChild(el);
+  return el;
 }
 
 async function selectPointCloud(
@@ -315,18 +342,7 @@ async function selectPointCloud(
     prefetchedDownloadBuffer = buffer;
     pointSizeControl.classList.remove('hidden');
 
-    const dlSizeMB = (resolved.download.size_bytes / (1024 * 1024)).toFixed(0);
-    (downloadBtn as HTMLButtonElement).textContent = `⤓ .ply (${dlSizeMB} MB)`;
-
-    colmapAvailable = resolved.colmap_available;
-    colmapSizeBytes = resolved.colmap_size_bytes;
-    if (colmapAvailable) {
-      const colmapMB = colmapSizeBytes ? (colmapSizeBytes / (1024 * 1024)).toFixed(0) : '?';
-      (downloadColmapBtn as HTMLButtonElement).textContent = `⤓ COLMAP (${colmapMB} MB)`;
-      downloadColmapBtn.classList.remove('hidden');
-    } else {
-      downloadColmapBtn.classList.add('hidden');
-    }
+    await updateDownloadButtons(captureId, resolved);
 
     const count = getPointCount();
     const countStr = count >= 1_000_000
@@ -365,3 +381,34 @@ async function selectPointCloud(
 function setStatus(msg: string): void {
   statusEl.textContent = msg;
 }
+
+async function updateDownloadButtons(captureId: string, resolved: ResolvedPointCloud): Promise<void> {
+  lastDownloadCaptureId = captureId;
+  lastDownloadPc = resolved.download;
+
+  const dlSizeMB = (resolved.download.size_bytes / (1024 * 1024)).toFixed(0);
+  (downloadBtn as HTMLButtonElement).textContent = `⤓ .ply (${dlSizeMB} MB)`;
+  downloadBtn.classList.remove('hidden');
+
+  colmapAvailable = resolved.colmap_available;
+  colmapSizeBytes = resolved.colmap_size_bytes;
+  if (colmapAvailable) {
+    const colmapMB = colmapSizeBytes ? (colmapSizeBytes / (1024 * 1024)).toFixed(0) : '?';
+    (downloadColmapBtn as HTMLButtonElement).textContent = `⤓ COLMAP (${colmapMB} MB)`;
+    downloadColmapBtn.classList.remove('hidden');
+  } else {
+    downloadColmapBtn.classList.add('hidden');
+  }
+
+  const meshInfo = await checkMeshAvailability(captureId);
+  meshAvailable = meshInfo.available;
+  meshSizeBytes = meshInfo.size_bytes;
+  if (meshAvailable) {
+    const meshMB = meshSizeBytes ? (meshSizeBytes / (1024 * 1024)).toFixed(0) : '?';
+    (downloadMeshBtn as HTMLButtonElement).textContent = `⤓ .glb (${meshMB} MB)`;
+    downloadMeshBtn.classList.remove('hidden');
+  } else {
+    downloadMeshBtn.classList.add('hidden');
+  }
+}
+

@@ -82,6 +82,8 @@ export interface ResolvedPointCloud {
   colmap_available: boolean;
   colmap_url: string | null;
   colmap_size_bytes: number | null;
+  mesh_available: boolean;
+  mesh_size_bytes: number | null;
 }
 
 export function resolvePointCloud(resp: PointCloudsResponse): ResolvedPointCloud | null {
@@ -93,7 +95,67 @@ export function resolvePointCloud(resp: PointCloudsResponse): ResolvedPointCloud
     colmap_available: !!resp.colmap_available,
     colmap_url: resp.colmap_url || null,
     colmap_size_bytes: resp.colmap_size_bytes || null,
+    mesh_available: false,
+    mesh_size_bytes: null,
   };
+}
+
+export async function checkMeshAvailability(captureId: string): Promise<{ available: boolean; size_bytes: number | null }> {
+  try {
+    const controller = new AbortController();
+    const res = await fetch(
+      `${getApiBase()}/captures/${captureId}/pointclouds/mesh.glb`,
+      { headers: authHeaders(), signal: controller.signal },
+    );
+    if (!res.ok) {
+      controller.abort();
+      return { available: false, size_bytes: null };
+    }
+    const cl = res.headers.get('Content-Length');
+    controller.abort();
+    return { available: true, size_bytes: cl ? parseInt(cl, 10) : null };
+  } catch {
+    return { available: false, size_bytes: null };
+  }
+}
+
+export async function fetchMeshGlb(
+  captureId: string,
+  onProgress?: (fraction: number) => void,
+  knownTotalBytes?: number | null,
+): Promise<ArrayBuffer> {
+  const res = await fetch(
+    `${getApiBase()}/captures/${captureId}/pointclouds/mesh.glb`,
+    { headers: authHeaders() },
+  );
+  if (!res.ok) throw new Error(`Failed to download mesh: ${res.status}`);
+
+  const clHeader = res.headers.get('Content-Length');
+  const total = clHeader ? parseInt(clHeader, 10) : (knownTotalBytes || 0);
+
+  if (!onProgress || !total || !res.body) {
+    return res.arrayBuffer();
+  }
+
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.length;
+    onProgress(received / total);
+  }
+
+  const buf = new Uint8Array(received);
+  let offset = 0;
+  for (const chunk of chunks) {
+    buf.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return buf.buffer;
 }
 
 export async function fetchCaptures(): Promise<CaptureListItem[]> {
