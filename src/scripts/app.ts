@@ -25,6 +25,8 @@ const downloadBtn = document.getElementById('download-btn')!;
 const downloadColmapBtn = document.getElementById('download-colmap-btn')!;
 const downloadMeshBtn = document.getElementById('download-mesh-btn')!;
 
+const pointCloudCache = new Map<string, ArrayBuffer>();
+
 let lastLoadedBuffer: ArrayBuffer | null = null;
 let lastLoadedFilename: string | null = null;
 let lastDownloadCaptureId: string | null = null;
@@ -255,6 +257,9 @@ async function loadSessions(): Promise<void> {
 
     sessionList.innerHTML = '';
 
+    // Sort newest first (descending by id)
+    captures.sort((a, b) => b.id.localeCompare(a.id));
+
     const results = await Promise.all(
       captures.map(async (c) => {
         try {
@@ -286,13 +291,23 @@ async function loadSessions(): Promise<void> {
   }
 }
 
+function parseCaptureDate(captureId: string): string {
+  // Try to parse formats like "20260419_143022" or "2026-04-19T14:30:22" or similar timestamp-based IDs
+  const m = captureId.match(/(\d{4})[\-_]?(\d{2})[\-_]?(\d{2})[\-_T]?(\d{2})[\-:_]?(\d{2})[\-:_]?(\d{2})/);
+  if (m) {
+    const [, y, mo, d, h, mi, s] = m;
+    return `${d}.${mo}.${y} · ${h}:${mi}:${s}`;
+  }
+  return captureId;
+}
+
 function renderPcItem(captureId: string, resolved: ResolvedPointCloud): HTMLButtonElement {
   const el = document.createElement('button');
   el.className = 'list-item';
   const sizeMB = (resolved.view.size_bytes / (1024 * 1024)).toFixed(1);
   el.innerHTML = `
     <div class="item-content">
-      <div class="item-title">${captureId}</div>
+      <div class="item-title">${parseCaptureDate(captureId)}</div>
       <div class="item-meta">${sizeMB} MB</div>
     </div>
     <div class="item-delete btn btn-icon" title="Delete capture"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></div>
@@ -348,14 +363,23 @@ async function selectPointCloud(
     sidebarEl.classList.add('collapsed');
   }
 
-  setStatus('Downloading point cloud…');
   viewerEmpty.classList.add('hidden');
   viewerProgress.textContent = '0 %';
   viewerLoading.classList.remove('hidden');
   try {
-    const buffer = await fetchPointCloudData(captureId, pc.filename, (f) => {
-      viewerProgress.textContent = `Downloading… ${Math.round(f * 100)} %`;
-    });
+    let buffer: ArrayBuffer;
+    const cacheKey = `${captureId}/${pc.filename}`;
+    if (pointCloudCache.has(cacheKey)) {
+      setStatus('Loading from cache…');
+      viewerProgress.textContent = 'Cached';
+      buffer = pointCloudCache.get(cacheKey)!;
+    } else {
+      setStatus('Downloading point cloud…');
+      buffer = await fetchPointCloudData(captureId, pc.filename, (f) => {
+        viewerProgress.textContent = `Downloading… ${Math.round(f * 100)} %`;
+      });
+      pointCloudCache.set(cacheKey, buffer);
+    }
     if (selectedPcKey !== pcKey) return;
 
     viewerProgress.textContent = 'Parsing…';
@@ -398,7 +422,7 @@ async function selectPointCloud(
       pointSizeSlider.value = '0.005';
     }
 
-    setStatus(`${pc.filename} loaded`);
+    setStatus(`Loaded .ply for ${captureId}`);
   } catch (err: unknown) {
     selectedPcKey = null;
     el.classList.remove('active');
