@@ -1,4 +1,4 @@
-import { setApiKey, login, fetchCaptures, fetchPointClouds, fetchPointCloudData, fetchColmapZip, fetchMeshGlb, checkMeshAvailability, resolvePointCloud, deleteCapture } from './api';
+import { setApiKey, login, fetchCaptures, fetchPointClouds, fetchPointCloudData, fetchColmapZip, fetchMeshGlb, checkMeshAvailability, resolvePointCloud, deleteCapture, clearPointCloudsCache } from './api';
 import type { CaptureListItem, PointCloudInfo, ResolvedPointCloud } from './api';
 import { initViewer, loadPointCloudFromBuffer, unloadPointCloud, setPointSize, hasScalarScale, getPointCount } from './viewer';
 
@@ -59,7 +59,7 @@ downloadBtn.addEventListener('click', async () => {
     const a = document.createElement('a');
     a.style.display = 'none';
     a.href = url;
-    a.download = lastDownloadPc.filename;
+    a.download = `Capture_${lastDownloadCaptureId}_pointcloud.ply`;
     document.body.appendChild(a);
     a.click();
     setTimeout(() => {
@@ -147,6 +147,7 @@ toggleBtn.addEventListener('click', () => {
 });
 
 refreshBtn.addEventListener('click', () => {
+  clearPointCloudsCache();
   loadSessions();
 });
 
@@ -259,29 +260,45 @@ async function loadSessions(): Promise<void> {
 
     captures.sort((a, b) => b.id.localeCompare(a.id));
 
-    const results = await Promise.all(
-      captures.map(async (c) => {
+    const skeletons = captures.map((c, i) => {
+      const el = renderSkeletonItem(c.id);
+      el.style.animationDelay = `${Math.min(i * 25, 400)}ms`;
+      sessionList.appendChild(el);
+      return { capture: c, el };
+    });
+
+    const CONCURRENCY = 10;
+    let idx = 0;
+    let rendered = 0;
+
+    const worker = async (): Promise<void> => {
+      while (idx < skeletons.length) {
+        const { capture, el } = skeletons[idx++];
         try {
-          const resp = await fetchPointClouds(c.id);
+          const resp = await fetchPointClouds(capture.id);
           const resolved = resolvePointCloud(resp);
-          return { capture: c, resolved };
+          if (resolved) {
+            upgradeSkeletonItem(el, capture.id, resolved);
+            rendered++;
+            const pcKey = `${capture.id}/${resolved.view.filename}`;
+            if (selectedPcKey === pcKey) {
+              el.classList.add('active');
+              updateDownloadButtons(capture.id, resolved);
+            }
+          } else {
+            el.remove();
+          }
         } catch {
-          return { capture: c, resolved: null as ResolvedPointCloud | null };
+          el.remove();
         }
-      })
+      }
+    };
+
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, skeletons.length) }, () => worker())
     );
 
-    for (const { capture, resolved } of results) {
-      if (!resolved) continue;
-      const el = renderPcItem(capture.id, resolved);
-      const pcKey = `${capture.id}/${resolved.view.filename}`;
-      if (selectedPcKey === pcKey) {
-        el.classList.add('active');
-        updateDownloadButtons(capture.id, resolved);
-      }
-    }
-
-    if (sessionList.children.length === 0) {
+    if (rendered === 0) {
       sessionList.innerHTML = '<div class="empty-state">No point clouds available.</div>';
     }
   } catch {
@@ -298,9 +315,27 @@ function parseCaptureDate(captureId: string): string {
   return captureId;
 }
 
-function renderPcItem(captureId: string, resolved: ResolvedPointCloud): HTMLButtonElement {
+function renderSkeletonItem(captureId: string): HTMLButtonElement {
   const el = document.createElement('button');
-  el.className = 'list-item';
+  el.className = 'list-item enter is-skeleton';
+  el.disabled = true;
+  el.innerHTML = `
+    <div class="item-content">
+      <div class="item-title">${parseCaptureDate(captureId)}</div>
+      <div class="item-meta"><span class="skeleton-bar"></span></div>
+    </div>
+    <div class="item-delete item-delete-skeleton"></div>
+  `;
+  return el;
+}
+
+function upgradeSkeletonItem(
+  el: HTMLButtonElement,
+  captureId: string,
+  resolved: ResolvedPointCloud,
+): void {
+  el.classList.remove('is-skeleton');
+  el.disabled = false;
   const sizeMB = (resolved.view.size_bytes / (1024 * 1024)).toFixed(1);
   el.innerHTML = `
     <div class="item-content">
@@ -309,6 +344,14 @@ function renderPcItem(captureId: string, resolved: ResolvedPointCloud): HTMLButt
     </div>
     <div class="item-delete btn btn-icon" title="Delete capture"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></div>
   `;
+  attachItemHandlers(el, captureId, resolved);
+}
+
+function attachItemHandlers(
+  el: HTMLButtonElement,
+  captureId: string,
+  resolved: ResolvedPointCloud,
+): void {
   el.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
     if (target.closest('.item-delete')) return;
@@ -337,9 +380,9 @@ function renderPcItem(captureId: string, resolved: ResolvedPointCloud): HTMLButt
       setStatus(`Delete error: ${err instanceof Error ? err.message : err}`);
     }
   });
-  sessionList.appendChild(el);
-  return el;
 }
+
+
 
 async function selectPointCloud(
   captureId: string,

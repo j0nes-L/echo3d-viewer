@@ -164,6 +164,7 @@ export async function deleteCapture(captureId: string): Promise<void> {
     headers: authHeaders(),
   });
   if (!res.ok) throw new Error(`Failed to delete capture: ${res.status}`);
+  pointCloudsRespCache.delete(captureId);
 }
 
 export async function fetchCaptures(): Promise<CaptureListItem[]> {
@@ -183,12 +184,25 @@ export async function fetchCaptureDetail(captureId: string): Promise<CaptureDeta
   return res.json();
 }
 
-export async function fetchPointClouds(captureId: string): Promise<PointCloudsResponse> {
+const pointCloudsRespCache = new Map<string, PointCloudsResponse>();
+
+export function clearPointCloudsCache(captureId?: string): void {
+  if (captureId) pointCloudsRespCache.delete(captureId);
+  else pointCloudsRespCache.clear();
+}
+
+export async function fetchPointClouds(captureId: string, forceRefresh = false): Promise<PointCloudsResponse> {
+  if (!forceRefresh) {
+    const cached = pointCloudsRespCache.get(captureId);
+    if (cached) return cached;
+  }
   const res = await fetch(`${getApiBase()}/captures/${captureId}/pointclouds`, {
     headers: authHeaders(),
   });
   if (!res.ok) throw new Error(`Failed to fetch point clouds: ${res.status}`);
-  return res.json();
+  const data = await res.json() as PointCloudsResponse;
+  pointCloudsRespCache.set(captureId, data);
+  return data;
 }
 
 export async function fetchPointCloudData(

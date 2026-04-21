@@ -252,6 +252,34 @@ html, body {
     text-align: left; transition: background 0.15s, border-color 0.2s;
     color: var(--text-primary); font-family: inherit;
 }
+.list-item.enter {
+    opacity: 0; transform: translateY(-6px);
+    animation: listItemIn 0.28s ease forwards;
+}
+@keyframes listItemIn {
+    to { opacity: 1; transform: translateY(0); }
+}
+.list-item.is-skeleton { cursor: default; }
+.list-item.is-skeleton:hover { background: var(--bg-card); border-color: var(--border-color); }
+.skeleton-bar {
+    display: inline-block; width: 60px; height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--border-color) 0%, var(--bg-card-hover) 50%, var(--border-color) 100%);
+    background-size: 200% 100%;
+    animation: skeletonShimmer 1.2s linear infinite;
+}
+.item-delete-skeleton {
+    width: 32px; height: 32px; border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: linear-gradient(90deg, var(--bg-card) 0%, var(--bg-card-hover) 50%, var(--bg-card) 100%);
+    background-size: 200% 100%;
+    animation: skeletonShimmer 1.2s linear infinite;
+    pointer-events: none;
+}
+@keyframes skeletonShimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
 .item-content { flex: 1; min-width: 0; }
 .item-delete {
     flex-shrink: 0; margin-left: 10px;
