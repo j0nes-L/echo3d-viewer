@@ -27,6 +27,17 @@ const clock = new THREE.Clock();
 let rightMouseDown = false;
 let gridMesh: THREE.Mesh | null = null;
 
+const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+  || (navigator.maxTouchPoints > 0 && window.matchMedia('(pointer: coarse)').matches);
+const HW_CONCURRENCY = navigator.hardwareConcurrency || 4;
+const DEVICE_MEMORY: number = (navigator.deviceMemory as number) || 4;
+const IS_LOW_END = IS_MOBILE || HW_CONCURRENCY <= 4 || DEVICE_MEMORY <= 4;
+
+const MAX_PIXEL_RATIO = IS_LOW_END ? 1.25 : 2.0;
+const MAX_POINTS_LOW_END = 800_000;
+const MAX_POINTS_DESKTOP = 6_000_000;
+const MAX_POINTS = IS_LOW_END ? MAX_POINTS_LOW_END : MAX_POINTS_DESKTOP;
+
 export function initViewer(containerEl: HTMLElement): void {
   container = containerEl;
 
@@ -40,9 +51,13 @@ export function initViewer(containerEl: HTMLElement): void {
     100000
   );
 
-  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer = new THREE.WebGLRenderer({
+    antialias: !IS_LOW_END,
+    powerPreference: IS_LOW_END ? 'low-power' : 'high-performance',
+    alpha: false,
+  });
   renderer.setSize(container.clientWidth, container.clientHeight, false);
-  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
   renderer.domElement.style.width = '100%';
   renderer.domElement.style.height = '100%';
   container.appendChild(renderer.domElement);
@@ -177,6 +192,12 @@ export async function loadPointCloudFromBuffer(
 
   const loader = new PLYLoader();
   const geometry = loader.parse(buffer);
+
+  const origCount = geometry.getAttribute('position').count;
+  if (origCount > MAX_POINTS) {
+    onProgress?.(`Subsampling (${(origCount / 1_000_000).toFixed(1)}M → ${(MAX_POINTS / 1_000_000).toFixed(1)}M)…`);
+    decimateGeometry(geometry, MAX_POINTS);
+  }
 
   onProgress?.('Processing colors…');
 
@@ -414,6 +435,32 @@ export function setPointSize(size: number): void {
 
 export function hasScalarScale(): boolean {
   return hasPerPointScale;
+}
+
+export function isLowEndDevice(): boolean {
+  return IS_LOW_END;
+}
+
+function decimateGeometry(geometry: THREE.BufferGeometry, targetCount: number): void {
+  const pos = geometry.getAttribute('position');
+  const n = pos.count;
+  if (n <= targetCount) return;
+  const stride = Math.ceil(n / targetCount);
+  const newCount = Math.floor(n / stride);
+
+  for (const name of Object.keys(geometry.attributes)) {
+    const attr = geometry.getAttribute(name) as THREE.BufferAttribute;
+    const itemSize = attr.itemSize;
+    const SrcArray = attr.array.constructor as { new (len: number): ArrayLike<number> & { set(a: ArrayLike<number>, off: number): void } };
+    const out = new SrcArray(newCount * itemSize) as Float32Array;
+    const src = attr.array as Float32Array;
+    for (let i = 0, j = 0; j < newCount; i += stride, j++) {
+      for (let k = 0; k < itemSize; k++) {
+        out[j * itemSize + k] = src[i * itemSize + k];
+      }
+    }
+    geometry.setAttribute(name, new THREE.BufferAttribute(out, itemSize, attr.normalized));
+  }
 }
 
 function buildMaterial(hasColors: boolean): THREE.Material {
