@@ -1,18 +1,10 @@
-declare global {
-  interface Window {
-    __ENV_API_BASE__?: string;
-    __ENV_API_KEY__?: string;
-  }
-}
+const API_BASE_URL = 'https://api-gateway-00224466.ludorfjonas.workers.dev/snapspace';
 
 function getApiBase(): string {
   if (import.meta.env.DEV) {
     return '/api-proxy';
   }
-  if (window.__ENV_API_BASE__) {
-    return window.__ENV_API_BASE__.replace(/\/+$/, '');
-  }
-  return 'https://api.00224466.xyz/snapspace';
+  return API_BASE_URL;
 }
 
 let apiKey = '';
@@ -257,7 +249,7 @@ export async function fetchColmapZip(
   onProgress?: (fraction: number) => void,
   knownTotalBytes?: number | null,
 ): Promise<ArrayBuffer> {
-  const prodBase = (window.__ENV_API_BASE__ || 'https://api.00224466.xyz/snapspace').replace(/\/+$/, '');
+  const prodBase = API_BASE_URL;
   const res = await fetch(
     `${prodBase}/captures/${captureId}/pointclouds/colmap.zip`,
     { headers: authHeaders() },

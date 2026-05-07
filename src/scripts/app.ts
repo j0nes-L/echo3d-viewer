@@ -203,10 +203,11 @@ loginForm.addEventListener('submit', async (e) => {
 const hasSession = sessionStorage.getItem(SESSION_KEY);
 const remembered = localStorage.getItem(REMEMBER_KEY);
 
-const envKey = (window.__ENV_API_KEY__ || '').trim();
+const envKey = '';
 if (envKey) {
   setApiKey(envKey);
 }
+
 
 if (hasSession) {
   userRole = (sessionStorage.getItem(ROLE_KEY) as UserRole) || 'viewer';

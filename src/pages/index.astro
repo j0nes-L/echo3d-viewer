@@ -1,7 +1,5 @@
 ---
 import '../styles/global.css';
-const envApiKey = import.meta.env.PUBLIC_API_KEY ?? '';
-const envApiBase = import.meta.env.PUBLIC_API_BASE ?? '';
 ---
 <!DOCTYPE html>
 <html lang="de">
@@ -85,10 +83,6 @@ const envApiBase = import.meta.env.PUBLIC_API_BASE ?? '';
         </div>
     </div>
 
-    <script is:inline define:vars={{ envApiKey, envApiBase }}>
-        window.__ENV_API_KEY__ = envApiKey;
-        window.__ENV_API_BASE__ = envApiBase;
-    </script>
     <script src="../scripts/app.ts"></script>
 </body>
 </html>
