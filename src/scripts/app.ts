@@ -8,6 +8,7 @@ import {
     fetchMeshGlb,
     fetchPointCloudData,
     fetchPointClouds,
+    getCachedMeshInfo,
     login,
     resolvePointCloud
 } from '../lib/snapspace-client';
@@ -308,7 +309,10 @@ async function loadSessions(): Promise<void> {
             while (idx < skeletons.length) {
                 const {capture, el} = skeletons[idx++];
                 try {
-                    const resp = await fetchPointClouds(capture.id);
+                    const [resp] = await Promise.all([
+                        fetchPointClouds(capture.id),
+                        checkMeshAvailability(capture.id),
+                    ]);
                     const resolved = resolvePointCloud(resp);
                     if (resolved) {
                         upgradeSkeletonItem(el, capture.id, resolved);
@@ -531,15 +535,26 @@ async function updateDownloadButtons(captureId: string, resolved: ResolvedPointC
         downloadColmapBtn.classList.add('hidden');
     }
 
-    const meshInfo = await checkMeshAvailability(captureId);
-    meshAvailable = meshInfo.available;
-    meshSizeBytes = meshInfo.size_bytes;
-    if (meshAvailable) {
-        const meshMB = meshSizeBytes ? (meshSizeBytes / (1024 * 1024)).toFixed(0) : '?';
-        (downloadMeshBtn as HTMLButtonElement).textContent = `⤓ .glb (${meshMB} MB)`;
-        downloadMeshBtn.classList.remove('hidden');
+    const applyMesh = (info: { available: boolean; size_bytes: number | null }): void => {
+        if (selectedPcKey !== `${captureId}/${resolved.view.filename}`) return;
+        meshAvailable = info.available;
+        meshSizeBytes = info.size_bytes;
+        if (meshAvailable) {
+            const meshMB = meshSizeBytes ? (meshSizeBytes / (1024 * 1024)).toFixed(0) : '?';
+            (downloadMeshBtn as HTMLButtonElement).textContent = `⤓ .glb (${meshMB} MB)`;
+            downloadMeshBtn.classList.remove('hidden');
+        } else {
+            downloadMeshBtn.classList.add('hidden');
+        }
+    };
+
+    const cached = getCachedMeshInfo(captureId);
+    if (cached) {
+        applyMesh(cached);
     } else {
         downloadMeshBtn.classList.add('hidden');
+        const info = await checkMeshAvailability(captureId);
+        applyMesh(info);
     }
 }
 

@@ -100,19 +100,51 @@ export async function checkMeshAvailability(captureId: string): Promise<{
     available: boolean;
     size_bytes: number | null
 }> {
-    try {
-        const res = await fetch(
-            `${getApiBase()}/get-mesh-info?capture_id=${captureId}`,
-            {headers: authHeaders()},
-        );
-        if (!res.ok) return {available: false, size_bytes: null};
-        const data = await res.json() as { available?: boolean; size_bytes?: number | null };
-        return {
-            available: !!data.available,
-            size_bytes: typeof data.size_bytes === 'number' ? data.size_bytes : null,
-        };
-    } catch {
-        return {available: false, size_bytes: null};
+    const cached = meshInfoCache.get(captureId);
+    if (cached) return cached;
+
+    const inflight = meshInfoInflight.get(captureId);
+    if (inflight) return inflight;
+
+    const p = (async () => {
+        try {
+            const res = await fetch(
+                `${getApiBase()}/get-mesh-info?capture_id=${captureId}`,
+                {headers: authHeaders()},
+            );
+            if (!res.ok) return {available: false, size_bytes: null};
+            const data = await res.json() as { available?: boolean; size_bytes?: number | null };
+            const result = {
+                available: !!data.available,
+                size_bytes: typeof data.size_bytes === 'number' ? data.size_bytes : null,
+            };
+            meshInfoCache.set(captureId, result);
+            return result;
+        } catch {
+            return {available: false, size_bytes: null};
+        } finally {
+            meshInfoInflight.delete(captureId);
+        }
+    })();
+
+    meshInfoInflight.set(captureId, p);
+    return p;
+}
+
+const meshInfoCache = new Map<string, { available: boolean; size_bytes: number | null }>();
+const meshInfoInflight = new Map<string, Promise<{ available: boolean; size_bytes: number | null }>>();
+
+export function getCachedMeshInfo(captureId: string): { available: boolean; size_bytes: number | null } | null {
+    return meshInfoCache.get(captureId) ?? null;
+}
+
+export function clearMeshInfoCache(captureId?: string): void {
+    if (captureId) {
+        meshInfoCache.delete(captureId);
+        meshInfoInflight.delete(captureId);
+    } else {
+        meshInfoCache.clear();
+        meshInfoInflight.clear();
     }
 }
 
@@ -186,6 +218,7 @@ const pointCloudsRespCache = new Map<string, PointCloudsResponse>();
 export function clearPointCloudsCache(captureId?: string): void {
     if (captureId) pointCloudsRespCache.delete(captureId);
     else pointCloudsRespCache.clear();
+    clearMeshInfoCache(captureId);
 }
 
 export async function fetchPointClouds(captureId: string, forceRefresh = false): Promise<PointCloudsResponse> {
