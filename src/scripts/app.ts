@@ -1,5 +1,5 @@
 import { setApiKey, login, fetchCaptures, fetchPointClouds, fetchPointCloudData, fetchColmapZip, fetchMeshGlb, checkMeshAvailability, resolvePointCloud, deleteCapture, clearPointCloudsCache } from '../lib/snapspace-client';
-import type { CaptureListItem, PointCloudInfo, ResolvedPointCloud, UserRole } from '../pages/api/fetch/ply';
+import type { CaptureListItem, PointCloudInfo, ResolvedPointCloud, UserRole } from '../lib/snapspace-client';
 import { initViewer, loadPointCloudFromBuffer, unloadPointCloud, setPointSize, hasScalarScale, getPointCount } from './viewer';
 
 const loginScreen = document.getElementById('login-screen')!;
@@ -52,7 +52,12 @@ downloadBtn.addEventListener('click', async () => {
       buffer = prefetchedDownloadBuffer;
     } else {
       btn.textContent = 'Downloading…';
-      buffer = await fetchPointCloudData(lastDownloadCaptureId, lastDownloadPc.filename);
+      buffer = await fetchPointCloudData(
+        lastDownloadCaptureId,
+        lastDownloadPc.filename,
+        (f) => { btn.textContent = `Downloading… ${Math.round(f * 100)}%`; },
+        lastDownloadPc.size_bytes,
+      );
     }
     const blob = new Blob([buffer], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
@@ -430,7 +435,7 @@ async function selectPointCloud(
       setStatus('Downloading point cloud…');
       buffer = await fetchPointCloudData(captureId, pc.filename, (f) => {
         viewerProgress.textContent = `Downloading… ${Math.round(f * 100)} %`;
-      });
+      }, pc.size_bytes);
       pointCloudCache.set(cacheKey, buffer);
     }
     if (selectedPcKey !== pcKey) return;

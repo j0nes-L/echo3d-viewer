@@ -44,14 +44,17 @@ export const GET: APIRoute = async ({ request }) => {
     }
 
     // Stream the response body
-    return new Response(response.body, {
-      status: 200,
-      headers: {
-        'Content-Type': response.headers.get('Content-Type') || 'application/octet-stream',
-        'Content-Length': response.headers.get('Content-Length') || '',
-        'Access-Control-Allow-Origin': '*',
-      },
-    });
+    const headers: Record<string, string> = {
+      'Content-Type': response.headers.get('Content-Type') || 'application/octet-stream',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Expose-Headers': 'Content-Length, X-Content-Length',
+    };
+    const cl = response.headers.get('Content-Length');
+    if (cl) {
+      headers['Content-Length'] = cl;
+      headers['X-Content-Length'] = cl;
+    }
+    return new Response(response.body, { status: 200, headers });
 
   } catch (error) {
     return new Response(JSON.stringify({ error: 'An internal error occurred.', details: error.message }), {

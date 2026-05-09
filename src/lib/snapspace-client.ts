@@ -98,18 +98,16 @@ export function resolvePointCloud(resp: PointCloudsResponse): ResolvedPointCloud
 
 export async function checkMeshAvailability(captureId: string): Promise<{ available: boolean; size_bytes: number | null }> {
   try {
-    const controller = new AbortController();
     const res = await fetch(
-      `${getApiBase()}/get-mesh?capture_id=${captureId}`,
-      { headers: authHeaders(), signal: controller.signal },
+      `${getApiBase()}/get-mesh-info?capture_id=${captureId}`,
+      { headers: authHeaders() },
     );
-    if (!res.ok) {
-      controller.abort();
-      return { available: false, size_bytes: null };
-    }
-    const cl = res.headers.get('Content-Length');
-    controller.abort();
-    return { available: true, size_bytes: cl ? parseInt(cl, 10) : null };
+    if (!res.ok) return { available: false, size_bytes: null };
+    const data = await res.json() as { available?: boolean; size_bytes?: number | null };
+    return {
+      available: !!data.available,
+      size_bytes: typeof data.size_bytes === 'number' ? data.size_bytes : null,
+    };
   } catch {
     return { available: false, size_bytes: null };
   }
@@ -126,7 +124,7 @@ export async function fetchMeshGlb(
   );
   if (!res.ok) throw new Error(`Failed to download mesh: ${res.status}`);
 
-  const clHeader = res.headers.get('Content-Length');
+  const clHeader = res.headers.get('Content-Length') || res.headers.get('X-Content-Length');
   const total = clHeader ? parseInt(clHeader, 10) : (knownTotalBytes || 0);
 
   if (!onProgress || !total || !res.body) {
@@ -205,6 +203,7 @@ export async function fetchPointCloudData(
   captureId: string,
   filename: string,
   onProgress?: (fraction: number) => void,
+  knownTotalBytes?: number | null,
 ): Promise<ArrayBuffer> {
   const res = await fetch(
     `${getApiBase()}/get-pointcloud?capture_id=${captureId}&filename=${filename}`,
@@ -212,12 +211,13 @@ export async function fetchPointCloudData(
   );
   if (!res.ok) throw new Error(`Failed to download point cloud: ${res.status}`);
 
-  const contentLength = res.headers.get('Content-Length');
-  if (!onProgress || !contentLength || !res.body) {
+  const clHeader = res.headers.get('Content-Length') || res.headers.get('X-Content-Length');
+  const total = clHeader ? parseInt(clHeader, 10) : (knownTotalBytes || 0);
+
+  if (!onProgress || !total || !res.body) {
     return res.arrayBuffer();
   }
 
-  const total = parseInt(contentLength, 10);
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
   let received = 0;
@@ -250,7 +250,7 @@ export async function fetchColmapZip(
   );
   if (!res.ok) throw new Error(`Failed to download COLMAP zip: ${res.status}`);
 
-  const clHeader = res.headers.get('Content-Length');
+  const clHeader = res.headers.get('Content-Length') || res.headers.get('X-Content-Length');
   const total = clHeader ? parseInt(clHeader, 10) : (knownTotalBytes || 0);
 
   if (!onProgress || !total || !res.body) {
