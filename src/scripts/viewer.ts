@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {PLYLoader} from 'three/addons/loaders/PLYLoader.js';
 
 const DEFAULT_POINT_SIZE = 0.005;
 const BACKGROUND_COLOR = 0x111111;
@@ -28,7 +28,7 @@ let rightMouseDown = false;
 let gridMesh: THREE.Mesh | null = null;
 
 const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
-  || (navigator.maxTouchPoints > 0 && window.matchMedia('(pointer: coarse)').matches);
+    || (navigator.maxTouchPoints > 0 && window.matchMedia('(pointer: coarse)').matches);
 const HW_CONCURRENCY = navigator.hardwareConcurrency || 4;
 const DEVICE_MEMORY: number = ((navigator as any).deviceMemory) || 4;
 const IS_LOW_END = IS_MOBILE || HW_CONCURRENCY <= 4 || DEVICE_MEMORY <= 4;
@@ -39,320 +39,322 @@ const MAX_POINTS_DESKTOP = 6_000_000;
 const MAX_POINTS = IS_LOW_END ? MAX_POINTS_LOW_END : MAX_POINTS_DESKTOP;
 
 export function initViewer(containerEl: HTMLElement): void {
-  container = containerEl;
+    container = containerEl;
 
-  scene = new THREE.Scene();
-  scene.background = new THREE.Color(BACKGROUND_COLOR);
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(BACKGROUND_COLOR);
 
-  camera = new THREE.PerspectiveCamera(
-    75,
-    container.clientWidth / container.clientHeight,
-    0.0001,
-    100000
-  );
+    camera = new THREE.PerspectiveCamera(
+        75,
+        container.clientWidth / container.clientHeight,
+        0.0001,
+        100000
+    );
 
-  renderer = new THREE.WebGLRenderer({
-    antialias: !IS_LOW_END,
-    powerPreference: IS_LOW_END ? 'low-power' : 'high-performance',
-    alpha: false,
-  });
-  renderer.setSize(container.clientWidth, container.clientHeight, false);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
-  renderer.domElement.style.width = '100%';
-  renderer.domElement.style.height = '100%';
-  container.appendChild(renderer.domElement);
+    renderer = new THREE.WebGLRenderer({
+        antialias: !IS_LOW_END,
+        powerPreference: IS_LOW_END ? 'low-power' : 'high-performance',
+        alpha: false,
+    });
+    renderer.setSize(container.clientWidth, container.clientHeight, false);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
+    renderer.domElement.style.width = '100%';
+    renderer.domElement.style.height = '100%';
+    container.appendChild(renderer.domElement);
 
-  controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.1;
-  controls.enablePan = true;
-  controls.screenSpacePanning = true;
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.1;
+    controls.enablePan = true;
+    controls.screenSpacePanning = true;
 
-  controls.mouseButtons = {
-    LEFT: THREE.MOUSE.ROTATE,
-    MIDDLE: THREE.MOUSE.PAN,
-    RIGHT: THREE.MOUSE.PAN,
-  };
+    controls.mouseButtons = {
+        LEFT: THREE.MOUSE.ROTATE,
+        MIDDLE: THREE.MOUSE.PAN,
+        RIGHT: THREE.MOUSE.PAN,
+    };
 
-  camera.position.set(0, 0, 3);
-  controls.update();
+    camera.position.set(0, 0, 3);
+    controls.update();
 
-  const FLY_KEYS = new Set(['w', 'a', 's', 'd', 'q', 'e', ' ']);
+    const FLY_KEYS = new Set(['w', 'a', 's', 'd', 'q', 'e', ' ']);
 
-  renderer.domElement.addEventListener('mousedown', (e) => {
-    if (e.button === 2) rightMouseDown = true;
-  });
-  renderer.domElement.addEventListener('mouseup', (e) => {
-    if (e.button === 2) {
-      rightMouseDown = false;
-      if (flyMode) exitFlyMode();
-    }
-  });
-  renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
+    renderer.domElement.addEventListener('mousedown', (e) => {
+        if (e.button === 2) rightMouseDown = true;
+    });
+    renderer.domElement.addEventListener('mouseup', (e) => {
+        if (e.button === 2) {
+            rightMouseDown = false;
+            if (flyMode) exitFlyMode();
+        }
+    });
+    renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
 
-  renderer.domElement.addEventListener('mousemove', (e) => {
-    if (!flyMode || !rightMouseDown) return;
-    flyYaw -= e.movementX * 0.002;
-    flyPitch -= e.movementY * 0.002;
-    flyPitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, flyPitch));
-    updateFlyCameraRotation();
-  });
+    renderer.domElement.addEventListener('mousemove', (e) => {
+        if (!flyMode || !rightMouseDown) return;
+        flyYaw -= e.movementX * 0.002;
+        flyPitch -= e.movementY * 0.002;
+        flyPitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, flyPitch));
+        updateFlyCameraRotation();
+    });
 
-  window.addEventListener('keydown', (e) => {
-    const key = e.key.toLowerCase();
-    flyKeys[key] = true;
-    if (key === 'shift') flySpeed = FLY_SPEED_BASE * 3;
-    if (FLY_KEYS.has(key) && rightMouseDown && !flyMode) {
-      enterFlyMode();
-    }
-  });
-  window.addEventListener('keyup', (e) => {
-    const key = e.key.toLowerCase();
-    flyKeys[key] = false;
-    if (key === 'shift') flySpeed = FLY_SPEED_BASE;
-    if (flyMode && ![...FLY_KEYS].some((k) => flyKeys[k])) {
-      exitFlyMode();
-    }
-  });
+    window.addEventListener('keydown', (e) => {
+        const key = e.key.toLowerCase();
+        flyKeys[key] = true;
+        if (key === 'shift') flySpeed = FLY_SPEED_BASE * 3;
+        if (FLY_KEYS.has(key) && rightMouseDown && !flyMode) {
+            enterFlyMode();
+        }
+    });
+    window.addEventListener('keyup', (e) => {
+        const key = e.key.toLowerCase();
+        flyKeys[key] = false;
+        if (key === 'shift') flySpeed = FLY_SPEED_BASE;
+        if (flyMode && ![...FLY_KEYS].some((k) => flyKeys[k])) {
+            exitFlyMode();
+        }
+    });
 
-  window.addEventListener('resize', onResize);
-  clock.start();
-  animate();
+    window.addEventListener('resize', onResize);
+    clock.start();
+    animate();
 }
 
 function enterFlyMode(): void {
-  flyMode = true;
-  controls.saveState();
-  controls.enabled = false;
-  const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
-  flyYaw = euler.y;
-  flyPitch = euler.x;
+    flyMode = true;
+    controls.saveState();
+    controls.enabled = false;
+    const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+    flyYaw = euler.y;
+    flyPitch = euler.x;
 }
 
 function exitFlyMode(): void {
-  flyMode = false;
-  controls.enabled = true;
-  const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-  controls.target.copy(camera.position).add(dir.multiplyScalar(2));
-  controls.update();
+    flyMode = false;
+    controls.enabled = true;
+    const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    controls.target.copy(camera.position).add(dir.multiplyScalar(2));
+    controls.update();
 }
 
 function updateFlyCameraRotation(): void {
-  const q = new THREE.Quaternion();
-  q.setFromEuler(new THREE.Euler(flyPitch, flyYaw, 0, 'YXZ'));
-  camera.quaternion.copy(q);
+    const q = new THREE.Quaternion();
+    q.setFromEuler(new THREE.Euler(flyPitch, flyYaw, 0, 'YXZ'));
+    camera.quaternion.copy(q);
 }
 
 function updateFlyMovement(dt: number): void {
-  if (!flyMode) return;
+    if (!flyMode) return;
 
-  const speed = flySpeed * dt;
-  const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-  const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-  const worldUp = new THREE.Vector3(0, 1, 0);
+    const speed = flySpeed * dt;
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+    const worldUp = new THREE.Vector3(0, 1, 0);
 
-  if (flyKeys['w']) camera.position.addScaledVector(forward, speed);
-  if (flyKeys['s']) camera.position.addScaledVector(forward, -speed);
-  if (flyKeys['d']) camera.position.addScaledVector(right, speed);
-  if (flyKeys['a']) camera.position.addScaledVector(right, -speed);
-  if (flyKeys['e'] || flyKeys[' ']) camera.position.addScaledVector(worldUp, speed);
-  if (flyKeys['q']) camera.position.addScaledVector(worldUp, -speed);
+    if (flyKeys['w']) camera.position.addScaledVector(forward, speed);
+    if (flyKeys['s']) camera.position.addScaledVector(forward, -speed);
+    if (flyKeys['d']) camera.position.addScaledVector(right, speed);
+    if (flyKeys['a']) camera.position.addScaledVector(right, -speed);
+    if (flyKeys['e'] || flyKeys[' ']) camera.position.addScaledVector(worldUp, speed);
+    if (flyKeys['q']) camera.position.addScaledVector(worldUp, -speed);
 }
 
 export function unloadPointCloud(): void {
-  if (currentPoints) {
-    scene.remove(currentPoints);
-    currentPoints.geometry.dispose();
-    if (currentPoints.material instanceof THREE.Material) {
-      currentPoints.material.dispose();
+    if (currentPoints) {
+        scene.remove(currentPoints);
+        currentPoints.geometry.dispose();
+        if (currentPoints.material instanceof THREE.Material) {
+            currentPoints.material.dispose();
+        }
+        currentPoints = null;
     }
-    currentPoints = null;
-  }
-  if (gridMesh) {
-    scene.remove(gridMesh);
-    gridMesh.geometry.dispose();
-    (gridMesh.material as THREE.Material).dispose();
-    gridMesh = null;
-  }
-  lastPointCount = 0;
+    if (gridMesh) {
+        scene.remove(gridMesh);
+        gridMesh.geometry.dispose();
+        (gridMesh.material as THREE.Material).dispose();
+        gridMesh = null;
+    }
+    lastPointCount = 0;
 }
 
 export function getPointCount(): number {
-  return lastPointCount;
+    return lastPointCount;
 }
 
 export async function loadPointCloudFromBuffer(
-  buffer: ArrayBuffer,
-  onProgress?: (msg: string) => void,
+    buffer: ArrayBuffer,
+    onProgress?: (msg: string) => void,
 ): Promise<void> {
-  unloadPointCloud();
-  pointSizeMultiplier = 1.0;
+    unloadPointCloud();
+    pointSizeMultiplier = 1.0;
 
-  onProgress?.('Parsing geometry…');
+    onProgress?.('Parsing geometry…');
 
-  const loader = new PLYLoader();
-  const geometry = loader.parse(buffer);
+    const loader = new PLYLoader();
+    const geometry = loader.parse(buffer);
 
-  const origCount = geometry.getAttribute('position').count;
-  if (origCount > MAX_POINTS) {
-    onProgress?.(`Subsampling (${(origCount / 1_000_000).toFixed(1)}M → ${(MAX_POINTS / 1_000_000).toFixed(1)}M)…`);
-    decimateGeometry(geometry, MAX_POINTS);
-  }
-
-  onProgress?.('Processing colors…');
-
-  if (geometry.hasAttribute('color')) {
-    const colorAttr = geometry.getAttribute('color');
-    const arr = colorAttr.array as Float32Array;
-    let maxVal = 0;
-    const len = Math.min(arr.length, 3000);
-    for (let i = 0; i < len; i++) { if (arr[i] > maxVal) maxVal = arr[i]; }
-    if (maxVal > 1.5) {
-      const scale = 1 / 255;
-      for (let i = 0; i < arr.length; i++) arr[i] *= scale;
-      colorAttr.needsUpdate = true;
+    const origCount = geometry.getAttribute('position').count;
+    if (origCount > MAX_POINTS) {
+        onProgress?.(`Subsampling (${(origCount / 1_000_000).toFixed(1)}M → ${(MAX_POINTS / 1_000_000).toFixed(1)}M)…`);
+        decimateGeometry(geometry, MAX_POINTS);
     }
-  }
 
-  hasPerPointScale = geometry.hasAttribute('scalar_scale');
+    onProgress?.('Processing colors…');
 
-  if (hasPerPointScale) {
-    const scaleAttr = geometry.getAttribute('scalar_scale');
-    const count = scaleAttr.count;
-    const sizes = new Float32Array(count);
-    for (let i = 0; i < count; i++) {
-      sizes[i] = Math.exp(scaleAttr.getX(i));
+    if (geometry.hasAttribute('color')) {
+        const colorAttr = geometry.getAttribute('color');
+        const arr = colorAttr.array as Float32Array;
+        let maxVal = 0;
+        const len = Math.min(arr.length, 3000);
+        for (let i = 0; i < len; i++) {
+            if (arr[i] > maxVal) maxVal = arr[i];
+        }
+        if (maxVal > 1.5) {
+            const scale = 1 / 255;
+            for (let i = 0; i < arr.length; i++) arr[i] *= scale;
+            colorAttr.needsUpdate = true;
+        }
     }
-    geometry.setAttribute('pointScale', new THREE.BufferAttribute(sizes, 1));
-  }
 
-  onProgress?.('Aligning…');
+    hasPerPointScale = geometry.hasAttribute('scalar_scale');
 
-  const posC = geometry.getAttribute('position');
-  const arrC = posC.array as Float32Array;
-  for (let i = 0; i < arrC.length; i += 3) {
-    arrC[i] = -arrC[i];
-  }
-  posC.needsUpdate = true;
+    if (hasPerPointScale) {
+        const scaleAttr = geometry.getAttribute('scalar_scale');
+        const count = scaleAttr.count;
+        const sizes = new Float32Array(count);
+        for (let i = 0; i < count; i++) {
+            sizes[i] = Math.exp(scaleAttr.getX(i));
+        }
+        geometry.setAttribute('pointScale', new THREE.BufferAttribute(sizes, 1));
+    }
 
-  geometry.computeBoundingBox();
-  const bb = geometry.boundingBox!;
-  const cx = (bb.max.x + bb.min.x) / 2;
-  const cy = (bb.max.y + bb.min.y) / 2;
-  const cz = (bb.max.z + bb.min.z) / 2;
-  for (let i = 0; i < arrC.length; i += 3) {
-    arrC[i] -= cx;
-    arrC[i + 1] -= cy;
-    arrC[i + 2] -= cz;
-  }
-  posC.needsUpdate = true;
+    onProgress?.('Aligning…');
 
-  geometry.computeBoundingBox();
-  const minY = geometry.boundingBox!.min.y;
-  const posAttr2 = geometry.getAttribute('position');
-  const arr2 = posAttr2.array as Float32Array;
-  for (let i = 1; i < arr2.length; i += 3) {
-    arr2[i] -= minY;
-  }
-  posAttr2.needsUpdate = true;
-
-  onProgress?.('Building renderer…');
-  const hasColors = geometry.hasAttribute('color');
-  const material = buildMaterial(hasColors);
-
-  const points = new THREE.Points(geometry, material);
-  scene.add(points);
-  currentPoints = points;
-
-  lastPointCount = geometry.getAttribute('position').count;
-
-  geometry.computeBoundingSphere();
-  const radius = geometry.boundingSphere!.radius;
-
-  if (radius > 0) {
-    flySpeed = radius * 0.5;
-    updateGrid(radius);
-
-    camera.near = radius * 0.00001;
-    camera.far = radius * 100;
-    camera.updateProjectionMatrix();
+    const posC = geometry.getAttribute('position');
+    const arrC = posC.array as Float32Array;
+    for (let i = 0; i < arrC.length; i += 3) {
+        arrC[i] = -arrC[i];
+    }
+    posC.needsUpdate = true;
 
     geometry.computeBoundingBox();
-    const centerY = geometry.boundingBox ? (geometry.boundingBox.max.y + geometry.boundingBox.min.y) / 2 : 0;
-    const maxY = geometry.boundingBox ? geometry.boundingBox.max.y : radius;
-    controls.target.set(0, centerY, 0);
-    controls.minDistance = 0;
-    controls.maxDistance = radius * 10;
-    controls.zoomSpeed = 3.0;
+    const bb = geometry.boundingBox!;
+    const cx = (bb.max.x + bb.min.x) / 2;
+    const cy = (bb.max.y + bb.min.y) / 2;
+    const cz = (bb.max.z + bb.min.z) / 2;
+    for (let i = 0; i < arrC.length; i += 3) {
+        arrC[i] -= cx;
+        arrC[i + 1] -= cy;
+        arrC[i + 2] -= cz;
+    }
+    posC.needsUpdate = true;
 
-    camera.position.set(0, Math.max(centerY, maxY * 0.5), radius * 2.0);
-    controls.update();
-    controls.saveState();
-  }
+    geometry.computeBoundingBox();
+    const minY = geometry.boundingBox!.min.y;
+    const posAttr2 = geometry.getAttribute('position');
+    const arr2 = posAttr2.array as Float32Array;
+    for (let i = 1; i < arr2.length; i += 3) {
+        arr2[i] -= minY;
+    }
+    posAttr2.needsUpdate = true;
 
-  onProgress?.('Point cloud loaded');
+    onProgress?.('Building renderer…');
+    const hasColors = geometry.hasAttribute('color');
+    const material = buildMaterial(hasColors);
+
+    const points = new THREE.Points(geometry, material);
+    scene.add(points);
+    currentPoints = points;
+
+    lastPointCount = geometry.getAttribute('position').count;
+
+    geometry.computeBoundingSphere();
+    const radius = geometry.boundingSphere!.radius;
+
+    if (radius > 0) {
+        flySpeed = radius * 0.5;
+        updateGrid(radius);
+
+        camera.near = radius * 0.00001;
+        camera.far = radius * 100;
+        camera.updateProjectionMatrix();
+
+        geometry.computeBoundingBox();
+        const centerY = geometry.boundingBox ? (geometry.boundingBox.max.y + geometry.boundingBox.min.y) / 2 : 0;
+        const maxY = geometry.boundingBox ? geometry.boundingBox.max.y : radius;
+        controls.target.set(0, centerY, 0);
+        controls.minDistance = 0;
+        controls.maxDistance = radius * 10;
+        controls.zoomSpeed = 3.0;
+
+        camera.position.set(0, Math.max(centerY, maxY * 0.5), radius * 2.0);
+        controls.update();
+        controls.saveState();
+    }
+
+    onProgress?.('Point cloud loaded');
 }
 
 function autoAlignGeometry(geometry: THREE.BufferGeometry): void {
-  const posAttr = geometry.getAttribute('position');
-  const arr = posAttr.array as Float32Array;
-  const n = posAttr.count;
+    const posAttr = geometry.getAttribute('position');
+    const arr = posAttr.array as Float32Array;
+    const n = posAttr.count;
 
-  geometry.computeBoundingBox();
-  const bb = geometry.boundingBox!;
-  const cx = (bb.max.x + bb.min.x) / 2;
-  const cy = (bb.max.y + bb.min.y) / 2;
-  const cz = (bb.max.z + bb.min.z) / 2;
-  for (let i = 0; i < n; i++) {
-    arr[i * 3] -= cx;
-    arr[i * 3 + 1] -= cy;
-    arr[i * 3 + 2] -= cz;
-  }
+    geometry.computeBoundingBox();
+    const bb = geometry.boundingBox!;
+    const cx = (bb.max.x + bb.min.x) / 2;
+    const cy = (bb.max.y + bb.min.y) / 2;
+    const cz = (bb.max.z + bb.min.z) / 2;
+    for (let i = 0; i < n; i++) {
+        arr[i * 3] -= cx;
+        arr[i * 3 + 1] -= cy;
+        arr[i * 3 + 2] -= cz;
+    }
 
-  const step = Math.max(1, Math.floor(n / 50000));
-  let cov_xx = 0, cov_xz = 0, cov_zz = 0;
-  for (let i = 0; i < n; i += step) {
-    const x = arr[i * 3], z = arr[i * 3 + 2];
-    cov_xx += x * x;
-    cov_xz += x * z;
-    cov_zz += z * z;
-  }
+    const step = Math.max(1, Math.floor(n / 50000));
+    let cov_xx = 0, cov_xz = 0, cov_zz = 0;
+    for (let i = 0; i < n; i += step) {
+        const x = arr[i * 3], z = arr[i * 3 + 2];
+        cov_xx += x * x;
+        cov_xz += x * z;
+        cov_zz += z * z;
+    }
 
-  const angle = 0.5 * Math.atan2(2 * cov_xz, cov_xx - cov_zz);
-  const cosA = Math.cos(-angle), sinA = Math.sin(-angle);
-  for (let i = 0; i < n; i++) {
-    const x = arr[i * 3], z = arr[i * 3 + 2];
-    arr[i * 3] = x * cosA - z * sinA;
-    arr[i * 3 + 2] = x * sinA + z * cosA;
-  }
+    const angle = 0.5 * Math.atan2(2 * cov_xz, cov_xx - cov_zz);
+    const cosA = Math.cos(-angle), sinA = Math.sin(-angle);
+    for (let i = 0; i < n; i++) {
+        const x = arr[i * 3], z = arr[i * 3 + 2];
+        arr[i * 3] = x * cosA - z * sinA;
+        arr[i * 3 + 2] = x * sinA + z * cosA;
+    }
 
-  posAttr.needsUpdate = true;
+    posAttr.needsUpdate = true;
 }
 
 function updateGrid(radius: number): void {
-  if (gridMesh) {
-    scene.remove(gridMesh);
-    gridMesh.geometry.dispose();
-    (gridMesh.material as THREE.Material).dispose();
-    gridMesh = null;
-  }
+    if (gridMesh) {
+        scene.remove(gridMesh);
+        gridMesh.geometry.dispose();
+        (gridMesh.material as THREE.Material).dispose();
+        gridMesh = null;
+    }
 
-  const gridScale = radius * 0.5;
-  const gridMat = new THREE.ShaderMaterial({
-    transparent: true,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-    uniforms: {
-      uScale: { value: gridScale },
-    },
-    vertexShader: `
+    const gridScale = radius * 0.5;
+    const gridMat = new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        uniforms: {
+            uScale: {value: gridScale},
+        },
+        vertexShader: `
       varying vec3 vWorldPos;
       void main() {
         vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
         gl_Position = projectionMatrix * viewMatrix * vec4(vWorldPos, 1.0);
       }
     `,
-    fragmentShader: `
+        fragmentShader: `
       uniform float uScale;
       varying vec3 vWorldPos;
       void main() {
@@ -369,105 +371,107 @@ function updateGrid(radius: number): void {
         gl_FragColor = vec4(vec3(0.4), alpha);
       }
     `,
-  });
+    });
 
-  const planeSize = radius * 200;
-  const planeGeo = new THREE.PlaneGeometry(planeSize, planeSize);
-  planeGeo.rotateX(-Math.PI / 2);
-  gridMesh = new THREE.Mesh(planeGeo, gridMat);
-  gridMesh.position.y = 0;
-  gridMesh.renderOrder = -1;
-  scene.add(gridMesh);
+    const planeSize = radius * 200;
+    const planeGeo = new THREE.PlaneGeometry(planeSize, planeSize);
+    planeGeo.rotateX(-Math.PI / 2);
+    gridMesh = new THREE.Mesh(planeGeo, gridMat);
+    gridMesh.position.y = 0;
+    gridMesh.renderOrder = -1;
+    scene.add(gridMesh);
 }
 
 function onResize(): void {
-  if (!container || !camera || !renderer) return;
-  const w = container.clientWidth;
-  const h = container.clientHeight;
-  if (w === 0 || h === 0) return;
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
-  renderer.setSize(w, h, false);
+    if (!container || !camera || !renderer) return;
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    if (w === 0 || h === 0) return;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h, false);
 }
 
 let lastW = 0, lastH = 0;
 
 function animate(): void {
-  animationId = requestAnimationFrame(animate);
-  clockDelta = clock.getDelta();
+    animationId = requestAnimationFrame(animate);
+    clockDelta = clock.getDelta();
 
-  const w = container.clientWidth;
-  const h = container.clientHeight;
-  if (w > 0 && h > 0 && (w !== lastW || h !== lastH)) {
-    lastW = w;
-    lastH = h;
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
-    renderer.setSize(w, h, false);
-  }
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    if (w > 0 && h > 0 && (w !== lastW || h !== lastH)) {
+        lastW = w;
+        lastH = h;
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h, false);
+    }
 
-  if (flyMode) {
-    updateFlyMovement(clockDelta);
-  } else {
-    controls.update();
-  }
+    if (flyMode) {
+        updateFlyMovement(clockDelta);
+    } else {
+        controls.update();
+    }
 
-  renderer.render(scene, camera);
+    renderer.render(scene, camera);
 }
 
 export function disposeViewer(): void {
-  if (animationId !== null) cancelAnimationFrame(animationId);
-  window.removeEventListener('resize', onResize);
-  unloadPointCloud();
-  renderer?.dispose();
-  controls?.dispose();
+    if (animationId !== null) cancelAnimationFrame(animationId);
+    window.removeEventListener('resize', onResize);
+    unloadPointCloud();
+    renderer?.dispose();
+    controls?.dispose();
 }
 
 export function setPointSize(size: number): void {
-  if (!currentPoints) return;
-  pointSizeMultiplier = size;
-  if (hasPerPointScale && currentPoints.material instanceof THREE.ShaderMaterial) {
-    currentPoints.material.uniforms.uSizeMultiplier.value = size;
-  } else if (currentPoints.material instanceof THREE.PointsMaterial) {
-    currentPoints.material.size = size;
-  }
+    if (!currentPoints) return;
+    pointSizeMultiplier = size;
+    if (hasPerPointScale && currentPoints.material instanceof THREE.ShaderMaterial) {
+        currentPoints.material.uniforms.uSizeMultiplier.value = size;
+    } else if (currentPoints.material instanceof THREE.PointsMaterial) {
+        currentPoints.material.size = size;
+    }
 }
 
 export function hasScalarScale(): boolean {
-  return hasPerPointScale;
+    return hasPerPointScale;
 }
 
 export function isLowEndDevice(): boolean {
-  return IS_LOW_END;
+    return IS_LOW_END;
 }
 
 function decimateGeometry(geometry: THREE.BufferGeometry, targetCount: number): void {
-  const pos = geometry.getAttribute('position');
-  const n = pos.count;
-  if (n <= targetCount) return;
-  const stride = Math.ceil(n / targetCount);
-  const newCount = Math.floor(n / stride);
+    const pos = geometry.getAttribute('position');
+    const n = pos.count;
+    if (n <= targetCount) return;
+    const stride = Math.ceil(n / targetCount);
+    const newCount = Math.floor(n / stride);
 
-  for (const name of Object.keys(geometry.attributes)) {
-    const attr = geometry.getAttribute(name) as THREE.BufferAttribute;
-    const itemSize = attr.itemSize;
-    const SrcArray = attr.array.constructor as { new (len: number): ArrayLike<number> & { set(a: ArrayLike<number>, off: number): void } };
-    const out = new SrcArray(newCount * itemSize) as Float32Array;
-    const src = attr.array as Float32Array;
-    for (let i = 0, j = 0; j < newCount; i += stride, j++) {
-      for (let k = 0; k < itemSize; k++) {
-        out[j * itemSize + k] = src[i * itemSize + k];
-      }
+    for (const name of Object.keys(geometry.attributes)) {
+        const attr = geometry.getAttribute(name) as THREE.BufferAttribute;
+        const itemSize = attr.itemSize;
+        const SrcArray = attr.array.constructor as {
+            new(len: number): ArrayLike<number> & { set(a: ArrayLike<number>, off: number): void }
+        };
+        const out = new SrcArray(newCount * itemSize) as Float32Array;
+        const src = attr.array as Float32Array;
+        for (let i = 0, j = 0; j < newCount; i += stride, j++) {
+            for (let k = 0; k < itemSize; k++) {
+                out[j * itemSize + k] = src[i * itemSize + k];
+            }
+        }
+        geometry.setAttribute(name, new THREE.BufferAttribute(out, itemSize, attr.normalized));
     }
-    geometry.setAttribute(name, new THREE.BufferAttribute(out, itemSize, attr.normalized));
-  }
 }
 
 function buildMaterial(hasColors: boolean): THREE.Material {
-  if (hasPerPointScale) {
-    return new THREE.ShaderMaterial({
-      uniforms: { uSizeMultiplier: { value: pointSizeMultiplier } },
-      vertexShader: `
+    if (hasPerPointScale) {
+        return new THREE.ShaderMaterial({
+            uniforms: {uSizeMultiplier: {value: pointSizeMultiplier}},
+            vertexShader: `
         attribute float pointScale;
         ${hasColors ? 'varying vec3 vColor;' : ''}
         uniform float uSizeMultiplier;
@@ -482,19 +486,19 @@ function buildMaterial(hasColors: boolean): THREE.Material {
           gl_Position = projectionMatrix * mvPosition;
         }
       `,
-      fragmentShader: `
+            fragmentShader: `
         ${hasColors ? 'varying vec3 vColor;' : ''}
         void main() {
           ${hasColors ? 'gl_FragColor = vec4(vColor, 1.0);' : 'gl_FragColor = vec4(1.0);'}
         }
       `,
-      vertexColors: hasColors,
+            vertexColors: hasColors,
+        });
+    }
+    return new THREE.PointsMaterial({
+        size: DEFAULT_POINT_SIZE,
+        vertexColors: hasColors,
+        sizeAttenuation: true,
     });
-  }
-  return new THREE.PointsMaterial({
-    size: DEFAULT_POINT_SIZE,
-    vertexColors: hasColors,
-    sizeAttenuation: true,
-  });
 }
 
