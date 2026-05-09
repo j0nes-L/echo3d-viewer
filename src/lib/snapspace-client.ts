@@ -100,7 +100,7 @@ export async function checkMeshAvailability(captureId: string): Promise<{ availa
   try {
     const controller = new AbortController();
     const res = await fetch(
-      `${getApiBase()}/captures/${captureId}/pointclouds/mesh.glb`,
+      `${getApiBase()}/get-mesh?capture_id=${captureId}`,
       { headers: authHeaders(), signal: controller.signal },
     );
     if (!res.ok) {
@@ -121,7 +121,7 @@ export async function fetchMeshGlb(
   knownTotalBytes?: number | null,
 ): Promise<ArrayBuffer> {
   const res = await fetch(
-    `${getApiBase()}/captures/${captureId}/pointclouds/mesh.glb`,
+    `${getApiBase()}/get-mesh?capture_id=${captureId}`,
     { headers: authHeaders() },
   );
   if (!res.ok) throw new Error(`Failed to download mesh: ${res.status}`);

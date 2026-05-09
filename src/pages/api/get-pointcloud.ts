@@ -1,8 +1,9 @@
 import type { APIRoute } from 'astro';
+import { getApiUrl } from '../../lib/endpoint-config';
 
 export const GET: APIRoute = async ({ request }) => {
   const apiKey = import.meta.env.SNAPSPACE_API_KEY;
-  const baseUrl = 'https://api.00224466.xyz/snapspace';
+  const baseUrl = getApiUrl();
 
   if (!apiKey) {
     return new Response(JSON.stringify({ error: 'API key is not configured.' }), {
@@ -59,4 +60,3 @@ export const GET: APIRoute = async ({ request }) => {
     });
   }
 };
-

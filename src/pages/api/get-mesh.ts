@@ -12,8 +12,19 @@ export const GET: APIRoute = async ({ request }) => {
     });
   }
 
+  const url = new URL(request.url);
+  const captureId = url.searchParams.get('capture_id');
+
+  if (!captureId) {
+    return new Response(JSON.stringify({ error: 'Missing capture_id parameter.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
-    const response = await fetch(`${baseUrl}/captures`, {
+    const apiUrl = `${baseUrl}/captures/${captureId}/pointclouds/mesh.glb`;
+    const response = await fetch(apiUrl, {
       headers: {
         'X-API-Key': apiKey,
       },
@@ -22,7 +33,7 @@ export const GET: APIRoute = async ({ request }) => {
     if (!response.ok) {
       const errorText = await response.text();
       return new Response(JSON.stringify({
-        error: 'Failed to fetch captures from SnapSpace API.',
+        error: 'Failed to fetch mesh.glb from SnapSpace API.',
         status: response.status,
         details: errorText
       }), {
@@ -31,11 +42,14 @@ export const GET: APIRoute = async ({ request }) => {
       });
     }
 
-    const data = await response.json();
-
-    return new Response(JSON.stringify(data), {
+    // Stream the response body
+    return new Response(response.body, {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': response.headers.get('Content-Type') || 'model/gltf-binary',
+        'Content-Length': response.headers.get('Content-Length') || '',
+        'Access-Control-Allow-Origin': '*',
+      },
     });
 
   } catch (error) {
