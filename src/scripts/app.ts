@@ -1,4 +1,4 @@
-import { setApiKey, login, fetchCaptures, fetchPointClouds, fetchPointCloudData, fetchColmapZip, fetchMeshGlb, checkMeshAvailability, resolvePointCloud, deleteCapture, clearPointCloudsCache } from '../pages/api/fetch/ply';
+import { setApiKey, login, fetchCaptures, fetchPointClouds, fetchPointCloudData, fetchColmapZip, fetchMeshGlb, checkMeshAvailability, resolvePointCloud, deleteCapture, clearPointCloudsCache } from '../api/client';
 import type { CaptureListItem, PointCloudInfo, ResolvedPointCloud, UserRole } from '../pages/api/fetch/ply';
 import { initViewer, loadPointCloudFromBuffer, unloadPointCloud, setPointSize, hasScalarScale, getPointCount } from './viewer';
 
@@ -202,11 +202,6 @@ loginForm.addEventListener('submit', async (e) => {
 
 const hasSession = sessionStorage.getItem(SESSION_KEY);
 const remembered = localStorage.getItem(REMEMBER_KEY);
-
-const envKey = '';
-if (envKey) {
-  setApiKey(envKey);
-}
 
 
 if (hasSession) {
