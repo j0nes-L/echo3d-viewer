@@ -30,7 +30,7 @@ let gridMesh: THREE.Mesh | null = null;
 const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
   || (navigator.maxTouchPoints > 0 && window.matchMedia('(pointer: coarse)').matches);
 const HW_CONCURRENCY = navigator.hardwareConcurrency || 4;
-const DEVICE_MEMORY: number = (navigator.deviceMemory as number) || 4;
+const DEVICE_MEMORY: number = ((navigator as any).deviceMemory) || 4;
 const IS_LOW_END = IS_MOBILE || HW_CONCURRENCY <= 4 || DEVICE_MEMORY <= 4;
 
 const MAX_PIXEL_RATIO = IS_LOW_END ? 1.25 : 2.0;

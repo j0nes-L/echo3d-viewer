@@ -74,7 +74,7 @@ export const GET: APIRoute = async ({ request }) => {
     return json({
       available: false,
       size_bytes: null,
-      error: (error as Error).message,
+      error: error instanceof Error ? error.message : String(error),
     }, 500);
   }
 };
