@@ -23,39 +23,35 @@ export const GET: APIRoute = async ({request}) => {
     }
 
     try {
-        const apiUrl = `${baseUrl}/captures/${captureId}/pointclouds/mesh.glb`;
-        const response = await fetch(apiUrl, {
+        // VERIFIED PATH: Capture_{id}/pointclouds/mesh.glb
+        const path = `Capture_${captureId}/pointclouds/mesh.glb`;
+        const fetchUrl = `${baseUrl}/share/get-download-link?path=${encodeURIComponent(path)}`;
+        
+        const linkResponse = await fetch(fetchUrl, {
             headers: {
                 'X-API-Key': apiKey,
             },
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            return new Response(JSON.stringify({
-                error: 'Failed to fetch mesh.glb from SnapSpace API.',
-                status: response.status,
-                details: errorText
-            }), {
-                status: response.status,
+        if (!linkResponse.ok) {
+            const errorText = await linkResponse.text();
+            return new Response(errorText, {
+                status: linkResponse.status,
                 headers: {'Content-Type': 'application/json'},
             });
         }
 
-        // Stream the response body
-        const headers: Record<string, string> = {
-            'Content-Type': response.headers.get('Content-Type') || 'model/gltf-binary',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Expose-Headers': 'Content-Length, X-Content-Length',
-        };
-        const cl = response.headers.get('Content-Length');
-        if (cl) {
-            headers['Content-Length'] = cl;
-            // Vercel/Node may strip Content-Length when streaming; mirror it so the
-            // client can still report download progress.
-            headers['X-Content-Length'] = cl;
+        const data = await linkResponse.json();
+        const downloadUrl = data.url;
+
+        if (!downloadUrl) {
+            return new Response(JSON.stringify({error: 'No download URL returned from API.'}), {
+                status: 500,
+                headers: {'Content-Type': 'application/json'},
+            });
         }
-        return new Response(response.body, {status: 200, headers});
+
+        return Response.redirect(downloadUrl, 302);
 
     } catch (error) {
         return new Response(JSON.stringify({
