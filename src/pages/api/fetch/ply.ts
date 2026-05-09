@@ -1,10 +1,5 @@
-const API_BASE_URL = 'https://api-gateway-00224466.ludorfjonas.workers.dev/snapspace';
-
 function getApiBase(): string {
-  if (import.meta.env.DEV) {
-    return '/api-proxy';
-  }
-  return API_BASE_URL;
+  return '/api';
 }
 
 let apiKey = '';
@@ -169,7 +164,7 @@ export async function deleteCapture(captureId: string): Promise<void> {
 }
 
 export async function fetchCaptures(): Promise<CaptureListItem[]> {
-  const res = await fetch(`${getApiBase()}/captures`, {
+  const res = await fetch(`${getApiBase()}/get-captures`, {
     headers: authHeaders(),
   });
   if (!res.ok) throw new Error(`Failed to fetch captures: ${res.status}`);
@@ -197,7 +192,7 @@ export async function fetchPointClouds(captureId: string, forceRefresh = false):
     const cached = pointCloudsRespCache.get(captureId);
     if (cached) return cached;
   }
-  const res = await fetch(`${getApiBase()}/captures/${captureId}/pointclouds`, {
+  const res = await fetch(`${getApiBase()}/get-pointclouds-info?capture_id=${captureId}`, {
     headers: authHeaders(),
   });
   if (!res.ok) throw new Error(`Failed to fetch point clouds: ${res.status}`);
@@ -212,7 +207,7 @@ export async function fetchPointCloudData(
   onProgress?: (fraction: number) => void,
 ): Promise<ArrayBuffer> {
   const res = await fetch(
-    `${getApiBase()}/captures/${captureId}/pointclouds/${filename}`,
+    `${getApiBase()}/get-pointcloud?capture_id=${captureId}&filename=${filename}`,
     { headers: authHeaders() },
   );
   if (!res.ok) throw new Error(`Failed to download point cloud: ${res.status}`);
@@ -249,9 +244,8 @@ export async function fetchColmapZip(
   onProgress?: (fraction: number) => void,
   knownTotalBytes?: number | null,
 ): Promise<ArrayBuffer> {
-  const prodBase = API_BASE_URL;
   const res = await fetch(
-    `${prodBase}/captures/${captureId}/pointclouds/colmap.zip`,
+    `${getApiBase()}/get-colmap?capture_id=${captureId}`,
     { headers: authHeaders() },
   );
   if (!res.ok) throw new Error(`Failed to download COLMAP zip: ${res.status}`);
@@ -283,4 +277,3 @@ export async function fetchColmapZip(
   }
   return buf.buffer;
 }
-
