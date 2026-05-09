@@ -1,5 +1,5 @@
-import { setApiKey, login, fetchCaptures, fetchPointClouds, fetchPointCloudData, fetchColmapZip, fetchMeshGlb, checkMeshAvailability, resolvePointCloud, deleteCapture, clearPointCloudsCache } from './api';
-import type { CaptureListItem, PointCloudInfo, ResolvedPointCloud, UserRole } from './api';
+import { setApiKey, login, fetchCaptures, fetchPointClouds, fetchPointCloudData, fetchColmapZip, fetchMeshGlb, checkMeshAvailability, resolvePointCloud, deleteCapture, clearPointCloudsCache } from '../pages/api/fetch/ply';
+import type { CaptureListItem, PointCloudInfo, ResolvedPointCloud, UserRole } from '../pages/api/fetch/ply';
 import { initViewer, loadPointCloudFromBuffer, unloadPointCloud, setPointSize, hasScalarScale, getPointCount } from './viewer';
 
 const loginScreen = document.getElementById('login-screen')!;
