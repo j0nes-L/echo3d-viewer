@@ -24,7 +24,6 @@ export const GET: APIRoute = async ({request}) => {
     }
 
     try {
-        // VERIFIED PATH: Capture_{id}/pointclouds/{filename}
         const path = `Capture_${captureId}/pointclouds/${filename}`;
         const fetchUrl = `${baseUrl}/share/get-download-link?path=${encodeURIComponent(path)}`;
         

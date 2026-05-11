@@ -188,20 +188,40 @@ export async function fetchMeshGlb(
 }
 
 export async function deleteCapture(captureId: string): Promise<void> {
-    const res = await fetch(`${getApiBase()}/captures/${captureId}`, {
-        method: 'DELETE',
-        headers: authHeaders(),
-    });
+    const res = await fetch(
+        `${getApiBase()}/delete-capture?capture_id=${encodeURIComponent(captureId)}`,
+        {
+            method: 'DELETE',
+            headers: authHeaders(),
+        },
+    );
     if (!res.ok) throw new Error(`Failed to delete capture: ${res.status}`);
     pointCloudsRespCache.delete(captureId);
+    clearMeshInfoCache(captureId);
 }
 
-export async function fetchCaptures(): Promise<CaptureListItem[]> {
-    const res = await fetch(`${getApiBase()}/get-captures`, {
+
+export interface CaptureOverviewEntry extends CaptureListItem {
+    pointclouds_info: PointCloudsResponse | null;
+    mesh_info: { available: boolean; size_bytes: number | null };
+}
+
+export async function fetchCapturesOverview(forceRefresh = false): Promise<CaptureOverviewEntry[]> {
+    const qs = forceRefresh ? '?refresh=1' : '';
+    const res = await fetch(`${getApiBase()}/get-captures-overview${qs}`, {
         headers: authHeaders(),
     });
-    if (!res.ok) throw new Error(`Failed to fetch captures: ${res.status}`);
-    const data = await res.json();
+    if (!res.ok) throw new Error(`Failed to fetch captures overview: ${res.status}`);
+    const data = await res.json() as { captures: CaptureOverviewEntry[] };
+
+    for (const entry of data.captures) {
+        if (entry.pointclouds_info) {
+            pointCloudsRespCache.set(entry.id, entry.pointclouds_info);
+        }
+        if (entry.mesh_info) {
+            meshInfoCache.set(entry.id, entry.mesh_info);
+        }
+    }
     return data.captures;
 }
 

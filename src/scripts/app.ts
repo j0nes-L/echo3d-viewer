@@ -3,11 +3,10 @@ import {
     checkMeshAvailability,
     clearPointCloudsCache,
     deleteCapture,
-    fetchCaptures,
+    fetchCapturesOverview,
     fetchColmapZip,
     fetchMeshGlb,
     fetchPointCloudData,
-    fetchPointClouds,
     getCachedMeshInfo,
     login,
     resolvePointCloud
@@ -283,57 +282,43 @@ async function loadSessions(): Promise<void> {
     setStatus('');
 
     try {
-        const captures = await fetchCaptures();
+        const overview = await fetchCapturesOverview();
 
-        if (captures.length === 0) {
+        if (overview.length === 0) {
             sessionList.innerHTML = '<div class="empty-state">No captures available.</div>';
             return;
         }
 
         sessionList.innerHTML = '';
 
-        captures.sort((a, b) => b.id.localeCompare(a.id));
+        overview.sort((a, b) => b.id.localeCompare(a.id));
 
-        const skeletons = captures.map((c, i) => {
-            const el = renderSkeletonItem(c.id);
-            el.style.animationDelay = `${Math.min(i * 25, 400)}ms`;
-            sessionList.appendChild(el);
-            return {capture: c, el};
-        });
-
-        const CONCURRENCY = 10;
-        let idx = 0;
         let rendered = 0;
 
-        const worker = async (): Promise<void> => {
-            while (idx < skeletons.length) {
-                const {capture, el} = skeletons[idx++];
-                try {
-                    const [resp] = await Promise.all([
-                        fetchPointClouds(capture.id),
-                        checkMeshAvailability(capture.id),
-                    ]);
-                    const resolved = resolvePointCloud(resp);
-                    if (resolved) {
-                        upgradeSkeletonItem(el, capture.id, resolved);
-                        rendered++;
-                        const pcKey = `${capture.id}/${resolved.view.filename}`;
-                        if (selectedPcKey === pcKey) {
-                            el.classList.add('active');
-                            updateDownloadButtons(capture.id, resolved);
-                        }
-                    } else {
-                        el.remove();
-                    }
-                } catch {
-                    el.remove();
-                }
-            }
-        };
+        overview.forEach((entry, i) => {
+            const el = renderSkeletonItem(entry.id);
+            el.style.animationDelay = `${Math.min(i * 25, 400)}ms`;
+            sessionList.appendChild(el);
 
-        await Promise.all(
-            Array.from({length: Math.min(CONCURRENCY, skeletons.length)}, () => worker())
-        );
+            if (!entry.pointclouds_info) {
+                el.remove();
+                return;
+            }
+            const resolved = resolvePointCloud(entry.pointclouds_info);
+            if (!resolved) {
+                el.remove();
+                return;
+            }
+
+            upgradeSkeletonItem(el, entry.id, resolved);
+            rendered++;
+
+            const pcKey = `${entry.id}/${resolved.view.filename}`;
+            if (selectedPcKey === pcKey) {
+                el.classList.add('active');
+                updateDownloadButtons(entry.id, resolved);
+            }
+        });
 
         if (rendered === 0) {
             sessionList.innerHTML = '<div class="empty-state">No point clouds available.</div>';
@@ -342,6 +327,7 @@ async function loadSessions(): Promise<void> {
         sessionList.innerHTML = '<div class="empty-state">No captures available.</div>';
     }
 }
+
 
 function parseCaptureDate(captureId: string): string {
     const m = captureId.match(/(\d{4})[\-_]?(\d{2})[\-_]?(\d{2})[\-_T]?(\d{2})[\-:_]?(\d{2})[\-:_]?(\d{2})/);

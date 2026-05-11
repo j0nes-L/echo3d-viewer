@@ -29,20 +29,17 @@ export const GET: APIRoute = async ({request}) => {
         });
 
     try {
-        // 1) Try HEAD first
         let head = await fetch(apiUrl, {
             method: 'HEAD',
             headers: {'X-API-Key': apiKey},
         });
 
         if (head.status === 405 || head.status === 501) {
-            // 2) Fallback: Range request (1 byte) to extract total size from Content-Range
             const range = await fetch(apiUrl, {
                 method: 'GET',
                 headers: {'X-API-Key': apiKey, Range: 'bytes=0-0'},
             });
 
-            // make sure we don't keep the body around
             try {
                 range.body?.cancel();
             } catch { /* ignore */
@@ -53,7 +50,7 @@ export const GET: APIRoute = async ({request}) => {
                 return json({available: false, size_bytes: null, status: range.status});
             }
 
-            const cr = range.headers.get('Content-Range'); // e.g. "bytes 0-0/12345"
+            const cr = range.headers.get('Content-Range');
             let size: number | null = null;
             if (cr) {
                 const m = cr.match(/\/(\d+)\s*$/);

@@ -23,7 +23,6 @@ export const GET: APIRoute = async ({request}) => {
     }
 
     try {
-        // VERIFIED PATH: Capture_{id}/pointclouds/mesh.glb
         const path = `Capture_${captureId}/pointclouds/mesh.glb`;
         const fetchUrl = `${baseUrl}/share/get-download-link?path=${encodeURIComponent(path)}`;
         
