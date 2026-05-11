@@ -7,6 +7,7 @@ export default defineConfig({
   output: 'server',
   adapter: vercel({
     imageService: false,
+    maxDuration: 30,
   }),
   server: {
     host: 'localhost',
