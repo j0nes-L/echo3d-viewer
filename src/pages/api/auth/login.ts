@@ -1,20 +1,10 @@
 import type {APIRoute} from 'astro';
+import {getApiUrl} from '../../../lib/endpoint-config';
 
 export const POST: APIRoute = async ({request}) => {
-    const adminPassword = import.meta.env.SNAPSPACE_ADMIN_PASSWORD;
-    const viewerPassword = import.meta.env.SNAPSPACE_PASSWORD;
-
-    if (!adminPassword || !viewerPassword) {
-        return new Response(JSON.stringify({error: 'Password is not configured on the server.'}), {
-            status: 500,
-            headers: {'Content-Type': 'application/json'},
-        });
-    }
-
-    let password;
+    let body: unknown;
     try {
-        const body = await request.json();
-        password = body.password;
+        body = await request.json();
     } catch {
         return new Response(JSON.stringify({error: 'Invalid request body.'}), {
             status: 400,
@@ -22,31 +12,25 @@ export const POST: APIRoute = async ({request}) => {
         });
     }
 
+    const upstreamUrl = `${getApiUrl()}/auth/login`;
 
-    if (!password) {
-        return new Response(JSON.stringify({authenticated: false, role: null}), {
-            status: 401,
+    let upstreamRes: Response;
+    try {
+        upstreamRes = await fetch(upstreamUrl, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body),
+        });
+    } catch {
+        return new Response(JSON.stringify({error: 'Could not reach authentication server.'}), {
+            status: 502,
             headers: {'Content-Type': 'application/json'},
         });
     }
 
-    if (password === adminPassword) {
-        return new Response(JSON.stringify({authenticated: true, role: 'admin'}), {
-            status: 200,
-            headers: {'Content-Type': 'application/json'},
-        });
-    }
-
-    if (password === viewerPassword) {
-        return new Response(JSON.stringify({authenticated: true, role: 'viewer'}), {
-            status: 200,
-            headers: {'Content-Type': 'application/json'},
-        });
-    }
-
-    return new Response(JSON.stringify({authenticated: false, role: null}), {
-        status: 401,
+    const data = await upstreamRes.text();
+    return new Response(data, {
+        status: upstreamRes.status,
         headers: {'Content-Type': 'application/json'},
     });
 };
-
