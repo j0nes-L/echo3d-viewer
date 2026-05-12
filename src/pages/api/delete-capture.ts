@@ -12,6 +12,40 @@ export const DELETE: APIRoute = async ({request}) => {
         });
     }
 
+    const adminPassword = request.headers.get('X-Admin-Password');
+    if (!adminPassword) {
+        return new Response(JSON.stringify({error: 'Unauthorized.'}), {
+            status: 401,
+            headers: {'Content-Type': 'application/json'},
+        });
+    }
+
+    try {
+        const authRes = await fetch(`${baseUrl}/auth/login`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({password: adminPassword}),
+        });
+        if (!authRes.ok) {
+            return new Response(JSON.stringify({error: 'Unauthorized.'}), {
+                status: 401,
+                headers: {'Content-Type': 'application/json'},
+            });
+        }
+        const authData = await authRes.json();
+        if (authData.authenticated !== true || authData.role !== 'admin') {
+            return new Response(JSON.stringify({error: 'Forbidden. Admin role required.'}), {
+                status: 403,
+                headers: {'Content-Type': 'application/json'},
+            });
+        }
+    } catch {
+        return new Response(JSON.stringify({error: 'Could not verify credentials.'}), {
+            status: 502,
+            headers: {'Content-Type': 'application/json'},
+        });
+    }
+
     const url = new URL(request.url);
     const captureId = url.searchParams.get('capture_id');
 

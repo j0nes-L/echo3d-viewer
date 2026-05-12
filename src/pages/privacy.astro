@@ -1,0 +1,56 @@
+---
+import '../styles/global.css';
+---
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy · SnapSpace</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
+    <style>html, body { overflow: auto !important; height: auto !important; }</style>
+</head>
+<body class="privacy-page">
+<div class="privacy-container">
+    <header class="privacy-header">
+        <a href="/" class="privacy-back">← Back</a>
+        <h1>Privacy Policy</h1>
+    </header>
+    <main class="privacy-content">
+        <h2>1. How We Handle Your Data</h2>
+        <p>When you use SnapSpace on your Meta Quest headset, we collect and process the following data to provide the application's core functionality:</p>
+        <ul>
+            <li><strong>Raw Sensor Data:</strong> Spatial and camera frame data captured by your headset's sensors to map your physical environment.</li>
+            <li><strong>Point Cloud Data:</strong> 3D spatial representations (scans) of the specific spaces you choose to capture within the app.</li>
+            <li><strong>Web Viewer Synchronization:</strong> All point clouds generated via the headset are automatically synced to our companion web viewer. During the test phase, these scans as well as the sensor data are visible to anyone visiting this site.</li>
+        </ul>
+        <p>We kindly ask that you do not scan highly private or sensitive spaces. Try to only share spaces you feel comfortable sharing.</p>
+
+        </ul>
+
+        <h2>2. Data Deletion and Your Privacy Rights</h2>
+        <p>You have the right to access, correct, or request the deletion of your personal data and spatial scans at any time. We provide this deletion process for all users, irrespective of their region, and we do not charge any fees for fulfilling data deletion requests.</p>
+        <p>If you request the deletion of your data, we will promptly remove your specific point cloud scans from the web viewer and securely delete the associated raw sensor data from our servers. We will fulfill all deletion requests unless we are strictly required by law to retain specific data.</p>
+
+        <h2>3. Contact Information</h2>
+        <p>If you have any questions, privacy concerns, or wish to formally request the deletion of your data, please contact me directly via:</p>
+        <p><a id="contact-mail" href="#" class="footer-link"></a></p>
+    </main>
+    <footer class="app-footer">
+        <span>&copy; Jonas Ludorf</span>
+        <span class="footer-sep">|</span>
+        <a href="/privacy" class="footer-link">Privacy Policy</a>
+    </footer>
+</div>
+<script>
+    const u = 'snapspace';
+    const d = 'jonasludorf.dev';
+    const el = document.getElementById('contact-mail');
+    if (el) {
+        el.href = 'mailto:' + u + '@' + d;
+        el.textContent = u + '@' + d;
+    }
+</script>
+</body>
+</html>
+

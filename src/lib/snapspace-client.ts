@@ -3,6 +3,7 @@ function getApiBase(): string {
 }
 
 let apiKey = '';
+let adminPassword = '';
 
 export function setApiKey(key: string): void {
     apiKey = key;
@@ -38,6 +39,9 @@ export async function login(password: string): Promise<LoginResult> {
     const data = await res.json();
     if (data.authenticated !== true) return {ok: false, role: null};
     const role: UserRole = data.role === 'admin' ? 'admin' : 'viewer';
+    if (role === 'admin') {
+        adminPassword = password;
+    }
     return {ok: true, role};
 }
 
@@ -188,16 +192,22 @@ export async function fetchMeshGlb(
 }
 
 export async function deleteCapture(captureId: string): Promise<void> {
+    const headers: Record<string, string> = {...authHeaders()};
+    if (adminPassword) headers['X-Admin-Password'] = adminPassword;
     const res = await fetch(
         `${getApiBase()}/delete-capture?capture_id=${encodeURIComponent(captureId)}`,
         {
             method: 'DELETE',
-            headers: authHeaders(),
+            headers,
         },
     );
     if (!res.ok) throw new Error(`Failed to delete capture: ${res.status}`);
     pointCloudsRespCache.delete(captureId);
     clearMeshInfoCache(captureId);
+}
+
+export function clearAdminSession(): void {
+    adminPassword = '';
 }
 
 

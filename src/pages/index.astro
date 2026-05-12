@@ -10,36 +10,33 @@ import '../styles/global.css';
     <link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
 </head>
 <body>
-<div id="login-screen" class="login-screen hidden">
-    <div class="login-card">
-        <div class="login-brand">
-            <span class="logo">[SnapSpace]</span>
-            <span class="subtitle">Point Cloud Viewer</span>
+
+<!-- Admin Login Modal -->
+<div id="admin-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+        <div class="modal-header">
+            <span class="modal-title">Admin Login</span>
+            <button id="modal-close-btn" class="btn btn-icon" title="Close">&#x2715;</button>
         </div>
-        <form id="login-form" autocomplete="on">
-            <label class="login-label" for="login-password">Password</label>
+        <form id="admin-login-form" autocomplete="on">
+            <label class="login-label" for="admin-password">Password</label>
             <input
-                    id="login-password"
+                    id="admin-password"
                     type="password"
                     class="login-input"
-                    placeholder="Enter password…"
+                    placeholder="Enter admin password…"
                     autocomplete="current-password"
                     required
             />
-            <div id="login-error" class="login-error hidden"></div>
-            <div class="login-row">
-                <label class="login-remember">
-                    <input id="login-remember" type="checkbox" checked/>
-                    Remember me
-                </label>
-                <button type="submit" id="login-btn" class="btn btn-accent login-btn">Login</button>
+            <div id="admin-login-error" class="login-error hidden"></div>
+            <div class="modal-actions">
+                <button type="submit" id="admin-login-btn" class="btn btn-accent login-btn">Login</button>
             </div>
         </form>
-        <div class="login-footer">&copy; 2026 Jonas Ludorf</div>
     </div>
 </div>
 
-<div id="app-screen" class="app-layout hidden">
+<div id="app-screen" class="app-layout">
     <header class="topbar">
         <div class="topbar-brand">
             <span class="logo">[SnapSpace]</span>
@@ -47,8 +44,8 @@ import '../styles/global.css';
         </div>
         <div id="status" class="topbar-status"></div>
         <div class="topbar-right">
-            <div class="topbar-footer">&copy; 2026 Jonas Ludorf</div>
-            <button id="logout-btn" class="btn btn-icon" title="Logout">&#x23FB;</button>
+            <button id="admin-btn" class="btn btn-secondary" title="Admin Login">Admin</button>
+            <button id="logout-btn" class="btn btn-icon hidden" title="Logout">&#x23FB;</button>
         </div>
     </header>
     <div class="main-area">
@@ -86,6 +83,11 @@ import '../styles/global.css';
             </div>
         </div>
     </div>
+    <footer class="app-footer">
+        <span>&copy; Jonas Ludorf</span>
+        <span class="footer-sep">|</span>
+        <a href="/privacy" class="footer-link">Privacy Policy</a>
+    </footer>
 </div>
 
 <script src="../scripts/app.ts"></script>

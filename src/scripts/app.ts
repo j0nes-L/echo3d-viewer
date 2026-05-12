@@ -1,6 +1,7 @@
 import type {PointCloudInfo, ResolvedPointCloud, UserRole} from '../lib/snapspace-client';
 import {
     checkMeshAvailability,
+    clearAdminSession,
     clearPointCloudsCache,
     deleteCapture,
     fetchCapturesOverview,
@@ -20,13 +21,14 @@ import {
     unloadPointCloud
 } from './viewer';
 
-const loginScreen = document.getElementById('login-screen')!;
 const appScreen = document.getElementById('app-screen')!;
-const loginForm = document.getElementById('login-form') as HTMLFormElement;
-const loginPassword = document.getElementById('login-password') as HTMLInputElement;
-const loginError = document.getElementById('login-error')!;
-const loginBtn = document.getElementById('login-btn') as HTMLButtonElement;
-const loginRemember = document.getElementById('login-remember') as HTMLInputElement;
+const adminModal = document.getElementById('admin-modal')!;
+const adminLoginForm = document.getElementById('admin-login-form') as HTMLFormElement;
+const adminPassword = document.getElementById('admin-password') as HTMLInputElement;
+const adminLoginError = document.getElementById('admin-login-error')!;
+const adminLoginBtn = document.getElementById('admin-login-btn') as HTMLButtonElement;
+const adminBtn = document.getElementById('admin-btn') as HTMLButtonElement;
+const modalCloseBtn = document.getElementById('modal-close-btn') as HTMLButtonElement;
 const sessionList = document.getElementById('session-list')!;
 const viewerContainer = document.getElementById('viewer')!;
 const statusEl = document.getElementById('status')!;
@@ -160,8 +162,6 @@ downloadMeshBtn.addEventListener('click', async () => {
 });
 
 
-const REMEMBER_KEY = 'rb_remember_pw';
-const SESSION_KEY = 'rb_logged_in';
 const ROLE_KEY = 'rb_role';
 const SPINNER = '<div class="spinner"></div>';
 
@@ -173,6 +173,57 @@ function isAdmin(): boolean {
     return userRole === 'admin';
 }
 
+function openAdminModal(): void {
+    adminModal.classList.remove('hidden');
+    adminLoginError.classList.add('hidden');
+    adminLoginError.textContent = '';
+    adminPassword.value = '';
+    setTimeout(() => adminPassword.focus(), 50);
+}
+
+function closeAdminModal(): void {
+    adminModal.classList.add('hidden');
+}
+
+adminBtn.addEventListener('click', () => openAdminModal());
+modalCloseBtn.addEventListener('click', () => closeAdminModal());
+adminModal.addEventListener('click', (e) => {
+    if (e.target === adminModal) closeAdminModal();
+});
+
+adminLoginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const pw = adminPassword.value.trim();
+    if (!pw) return;
+
+    adminLoginBtn.disabled = true;
+    adminLoginBtn.textContent = '…';
+    adminLoginError.classList.add('hidden');
+    adminLoginError.textContent = '';
+
+    try {
+        const result = await login(pw);
+        if (result.ok) {
+            userRole = result.role ?? 'viewer';
+            sessionStorage.setItem(ROLE_KEY, userRole);
+            closeAdminModal();
+            updateAdminUI();
+            clearPointCloudsCache();
+            loadSessions();
+        } else {
+            adminLoginError.textContent = 'Falsches Passwort.';
+            adminLoginError.classList.remove('hidden');
+            adminPassword.focus();
+        }
+    } catch (err: unknown) {
+        adminLoginError.textContent = `Fehler: ${err instanceof Error ? err.message : err}`;
+        adminLoginError.classList.remove('hidden');
+    } finally {
+        adminLoginBtn.disabled = false;
+        adminLoginBtn.textContent = 'Login';
+    }
+});
+
 toggleBtn.addEventListener('click', () => {
     sidebarEl.classList.toggle('collapsed');
 });
@@ -183,99 +234,40 @@ refreshBtn.addEventListener('click', () => {
 });
 
 logoutBtn.addEventListener('click', () => {
-    sessionStorage.removeItem(SESSION_KEY);
+    userRole = 'viewer';
     sessionStorage.removeItem(ROLE_KEY);
-    localStorage.removeItem(REMEMBER_KEY);
-    window.location.reload();
-});
-
-loginForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const pw = loginPassword.value.trim();
-    if (!pw) return;
-
-    loginBtn.disabled = true;
-    loginBtn.textContent = '…';
-    loginError.classList.add('hidden');
-    loginError.textContent = '';
-
-    try {
-        const result = await login(pw);
-        if (result.ok) {
-            userRole = result.role ?? 'viewer';
-            sessionStorage.setItem(SESSION_KEY, '1');
-            sessionStorage.setItem(ROLE_KEY, userRole);
-            if (loginRemember.checked) {
-                localStorage.setItem(REMEMBER_KEY, pw);
-            } else {
-                localStorage.removeItem(REMEMBER_KEY);
-            }
-            showApp();
-        } else {
-            loginError.textContent = 'Falsches Passwort.';
-            loginError.classList.remove('hidden');
-            loginPassword.focus();
-        }
-    } catch (err: unknown) {
-        loginError.textContent = `Fehler: ${err instanceof Error ? err.message : err}`;
-        loginError.classList.remove('hidden');
-    } finally {
-        loginBtn.disabled = false;
-        loginBtn.textContent = 'Login';
-    }
-});
-
-const hasSession = sessionStorage.getItem(SESSION_KEY);
-const remembered = localStorage.getItem(REMEMBER_KEY);
-
-
-if (hasSession) {
-    userRole = (sessionStorage.getItem(ROLE_KEY) as UserRole) || 'viewer';
-    showApp();
-} else if (remembered) {
-    autoLogin(remembered);
-} else {
-    showLogin();
-}
-
-async function autoLogin(pw: string): Promise<void> {
-    try {
-        const result = await login(pw);
-        if (result.ok) {
-            userRole = result.role ?? 'viewer';
-            sessionStorage.setItem(SESSION_KEY, '1');
-            sessionStorage.setItem(ROLE_KEY, userRole);
-            showApp();
-            return;
-        }
-    } catch {
-    }
-    loginPassword.value = pw;
-    loginRemember.checked = true;
-    showLogin();
-}
-
-function showLogin(): void {
-    appScreen.classList.add('hidden');
-    loginScreen.classList.remove('hidden');
-}
-
-function showApp(): void {
-    loginScreen.classList.add('hidden');
-    appScreen.classList.remove('hidden');
-
-    if (window.innerWidth <= 768) {
-        sidebarEl.classList.add('collapsed');
-    }
-
-    if (!viewerInitialised) {
-        initViewer(viewerContainer as HTMLElement);
-        viewerInitialised = true;
-    }
-
-
+    clearAdminSession();
+    updateAdminUI();
+    clearPointCloudsCache();
     loadSessions();
+});
+
+function updateAdminUI(): void {
+    if (isAdmin()) {
+        adminBtn.classList.add('hidden');
+        logoutBtn.classList.remove('hidden');
+    } else {
+        adminBtn.classList.remove('hidden');
+        logoutBtn.classList.add('hidden');
+    }
 }
+
+// Restore admin session if previously logged in
+const savedRole = sessionStorage.getItem(ROLE_KEY) as UserRole | null;
+if (savedRole === 'admin') {
+    userRole = 'admin';
+}
+
+updateAdminUI();
+
+
+// Always show app directly (no login wall)
+if (window.innerWidth <= 768) {
+    sidebarEl.classList.add('collapsed');
+}
+initViewer(viewerContainer as HTMLElement);
+viewerInitialised = true;
+loadSessions();
 
 async function loadSessions(): Promise<void> {
     sessionList.innerHTML = SPINNER;
