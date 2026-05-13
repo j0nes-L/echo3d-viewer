@@ -14,7 +14,6 @@ import {
 } from '../lib/snapspace-client';
 import {
     getPointCount,
-    hasScalarScale,
     initViewer,
     loadPointCloudFromBuffer,
     setPointSize,
@@ -422,17 +421,11 @@ async function selectPointCloud(captureId: string, resolved: ResolvedPointCloud,
             metaEl.textContent = `${sizeMB} MB · ${countStr}`;
         }
 
-        if (hasScalarScale()) {
-            pointSizeSlider.min = '0.1';
-            pointSizeSlider.max = '5';
-            pointSizeSlider.step = '0.1';
-            pointSizeSlider.value = '1';
-        } else {
-            pointSizeSlider.min = '0.001';
-            pointSizeSlider.max = '0.05';
-            pointSizeSlider.step = '0.001';
-            pointSizeSlider.value = '0.005';
-        }
+        pointSizeSlider.min = '0.001';
+        pointSizeSlider.max = '0.05';
+        pointSizeSlider.step = '0.001';
+        pointSizeSlider.value = '0.005';
+        setPointSize(0.005);
 
         setStatus(`Loaded Point Cloud for Capture_${captureId}`);
         updateItemCacheIcon(el, true);

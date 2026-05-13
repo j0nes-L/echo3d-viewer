@@ -216,17 +216,7 @@ export async function loadPointCloudFromBuffer(
         }
     }
 
-    hasPerPointScale = geometry.hasAttribute('scalar_scale');
-
-    if (hasPerPointScale) {
-        const scaleAttr = geometry.getAttribute('scalar_scale');
-        const count = scaleAttr.count;
-        const sizes = new Float32Array(count);
-        for (let i = 0; i < count; i++) {
-            sizes[i] = Math.exp(scaleAttr.getX(i));
-        }
-        geometry.setAttribute('pointScale', new THREE.BufferAttribute(sizes, 1));
-    }
+    hasPerPointScale = false;
 
     onProgress?.('Aligning…');
 

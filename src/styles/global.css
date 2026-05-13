@@ -780,6 +780,7 @@ html, body {
 
     .point-size-control {
         top: 6px;
+        bottom: auto;
         right: 6px;
         padding: 5px 10px;
     }
