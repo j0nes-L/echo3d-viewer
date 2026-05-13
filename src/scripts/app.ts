@@ -249,6 +249,7 @@ updateAdminUI();
 
 if (window.innerWidth <= 768) {
     sidebarEl.classList.add('collapsed');
+    toggleBtn.textContent = '›';
 }
 initViewer(viewerContainer as HTMLElement);
 viewerInitialised = true;
