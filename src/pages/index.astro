@@ -11,7 +11,6 @@ import '../styles/global.css';
 </head>
 <body>
 
-<!-- Admin Login Modal -->
 <div id="admin-modal" class="modal-overlay hidden">
     <div class="modal-card">
         <div class="modal-header">
@@ -36,43 +35,31 @@ import '../styles/global.css';
     </div>
 </div>
 
+<div class="admin-fixed">
+    <button id="admin-btn" class="btn btn-secondary" title="Admin Login">Admin</button>
+    <button id="logout-btn" class="btn btn-icon hidden" title="Logout">&#x23FB;</button>
+</div>
+
 <div id="app-screen" class="app-layout">
-    <header class="topbar">
-        <div class="topbar-brand">
-            <span class="logo">[SnapSpace]</span>
-            <span class="subtitle">Point Cloud Viewer</span>
-        </div>
-        <div id="status" class="topbar-status"></div>
-        <div class="topbar-right">
-            <button id="admin-btn" class="btn btn-secondary" title="Admin Login">Admin</button>
-            <button id="logout-btn" class="btn btn-icon hidden" title="Logout">&#x23FB;</button>
-        </div>
-    </header>
     <div class="main-area">
-        <button id="sidebar-toggle" class="btn btn-icon sidebar-toggle-float" title="Toggle sidebar">&#9776;</button>
         <aside id="sidebar" class="sidebar">
-            <div class="sidebar-header">
-                <div style="display:flex;align-items:center;gap:8px;">
-                    <h2>Point Clouds</h2>
+            <div class="sidebar-topbar">
+                <div class="topbar-brand">
+                    <span class="logo">[SnapSpace]</span>
+                    <span class="topbar-subtitle">Point Cloud Viewer</span>
                 </div>
-                <div class="sidebar-actions">
-                    <button id="refresh-btn" class="btn btn-icon" title="Refresh">&#8635;</button>
-                </div>
+                <button id="refresh-btn" class="btn btn-icon" title="Refresh">&#8635;</button>
             </div>
             <div class="sidebar-body">
+                <div class="sidebar-section-label">Captures</div>
                 <div id="session-list">
                     <div class="empty-state">No captures available.</div>
                 </div>
             </div>
         </aside>
+        <button id="sidebar-toggle" class="sidebar-edge-toggle" title="Toggle sidebar">&#8249;</button>
         <div id="viewer" class="viewer-container">
             <div id="point-size-control" class="point-size-control hidden">
-                <button id="download-btn" class="btn btn-download hidden" title="Download .ply">⤓ .ply</button>
-                <button id="download-colmap-btn" class="btn btn-download hidden" title="Download COLMAP .zip">⤓ COLMAP
-                </button>
-                <button id="download-mesh-btn" class="btn btn-download hidden"
-                        title="Download Mesh .glb (Experimental)">⤓ .glb
-                </button>
                 <label for="point-size-slider">Size</label>
                 <input id="point-size-slider" type="range" min="0.001" max="0.05" step="0.001" value="0.005"/>
             </div>
@@ -81,13 +68,44 @@ import '../styles/global.css';
                 <div class="spinner-large"></div>
                 <div id="viewer-progress" class="viewer-progress">0 %</div>
             </div>
+            <div id="status" class="viewer-status"></div>
         </div>
     </div>
     <footer class="app-footer">
         <span>&copy; Jonas Ludorf</span>
         <span class="footer-sep">|</span>
         <a href="/privacy" class="footer-link">Privacy Policy</a>
+        <span class="footer-sep">|</span>
+        <a href="https://jonasludorf.dev/legal/" class="footer-link">Legal Note</a>
     </footer>
+</div>
+
+<div id="item-downloads-section" class="item-downloads-section">
+    <div class="item-downloads-inner">
+        <div class="dl-slot" id="dl-slot-ply">
+            <div class="dl-slot-inner">
+                <button id="download-btn" class="btn btn-download">⤓ .ply</button>
+            </div>
+        </div>
+        <div class="dl-slot" id="dl-slot-colmap">
+            <div class="dl-slot-inner">
+                <button id="download-colmap-btn" class="btn btn-download">⤓ COLMAP</button>
+            </div>
+        </div>
+        <div class="dl-slot" id="dl-slot-mesh">
+            <div class="dl-slot-inner">
+                <button id="download-mesh-btn" class="btn btn-download">⤓ .glb</button>
+            </div>
+        </div>
+        <div class="dl-slot" id="dl-slot-delete">
+            <div class="dl-slot-inner" style="padding-top:4px">
+                <button id="item-delete-btn" class="btn btn-download btn-download-danger">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;flex-shrink:0"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                    Delete Capture
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script src="../scripts/app.ts"></script>
