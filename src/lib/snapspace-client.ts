@@ -3,7 +3,6 @@ function getApiBase(): string {
 }
 
 let apiKey = '';
-let adminPassword = '';
 
 export function setApiKey(key: string): void {
     apiKey = key;
@@ -23,27 +22,6 @@ function authHeaders(): Record<string, string> {
 
 export type UserRole = 'admin' | 'viewer';
 
-export interface LoginResult {
-    ok: boolean;
-    role: UserRole | null;
-}
-
-export async function login(password: string): Promise<LoginResult> {
-    const res = await fetch(`${getApiBase()}/auth/login`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json', ...authHeaders()},
-        body: JSON.stringify({password}),
-    });
-    if (res.status === 401) return {ok: false, role: null};
-    if (!res.ok) throw new Error(`Login failed: ${res.status}`);
-    const data = await res.json();
-    if (data.authenticated !== true) return {ok: false, role: null};
-    const role: UserRole = data.role === 'admin' ? 'admin' : 'viewer';
-    if (role === 'admin') {
-        adminPassword = password;
-    }
-    return {ok: true, role};
-}
 
 export interface CaptureListItem {
     id: string;
@@ -192,13 +170,11 @@ export async function fetchMeshGlb(
 }
 
 export async function deleteCapture(captureId: string): Promise<void> {
-    const headers: Record<string, string> = {...authHeaders()};
-    if (adminPassword) headers['X-Admin-Password'] = adminPassword;
     const res = await fetch(
-        `${getApiBase()}/delete-capture?capture_id=${encodeURIComponent(captureId)}`,
+        `${getApiBase()}/auth/delete-capture?capture_id=${encodeURIComponent(captureId)}`,
         {
             method: 'DELETE',
-            headers,
+            headers: {...authHeaders()},
         },
     );
     if (!res.ok) throw new Error(`Failed to delete capture: ${res.status}`);
@@ -207,7 +183,7 @@ export async function deleteCapture(captureId: string): Promise<void> {
 }
 
 export function clearAdminSession(): void {
-    adminPassword = '';
+    // No-op: legacy function kept for compatibility
 }
 
 
