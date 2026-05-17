@@ -2,7 +2,7 @@ import { defineConfig } from 'astro/config';
 import vercel from '@astrojs/vercel';
 
 export default defineConfig({
-  site: 'https://snapspace.jonasludorf.dev',
+  site: 'https://snapspace.cloud',
   base: '/',
   output: 'server',
   adapter: vercel({
